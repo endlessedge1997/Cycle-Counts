@@ -661,8 +661,22 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
     </p>
   </div>
 
+  <div class="card" style="border-color:var(--green)">
+    <div class="card-title" style="color:var(--green)">🔄 Live Sync from Pace</div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">
+      Pulls the latest combined CSV from the configured GitHub Gist and refreshes all cycle counts. Your in-progress counts and history are preserved.
+    </p>
+    <div id="syncStatus" style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:10px;letter-spacing:.5px;word-break:break-word">Not synced yet</div>
+    <button class="btn btn-green" onclick="syncNow()" style="margin:0">⬇ Sync Now from Pace</button>
+    <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:10px;color:var(--muted);line-height:1.5">
+      <strong style="color:var(--text)">Manager:</strong> push fresh Pace data to the gist with the <em>SYNC F12 Script</em> below. Run it from any logged-in Pace page; it scrapes all CCs and uploads in one shot.
+      <br><br>
+      <button class="btn btn-primary" onclick="copyF12SyncScript()" style="margin:0;padding:8px 12px;font-size:11px">📋 Copy SYNC F12 Script (Pace → Gist)</button>
+    </div>
+  </div>
+
   <div class="card" style="border-color:var(--gold)">
-    <div class="card-title" style="color:var(--gold)">Import Cycle Count CSV</div>
+    <div class="card-title" style="color:var(--gold)">Import Cycle Count CSV (manual)</div>
 
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px;font-size:11px;color:var(--text);line-height:1.6">
       <div style="font-family:var(--head);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:6px">Step 1 — Get the CSV from Pace</div>
@@ -874,6 +888,8 @@ const expandedCards = new Set();
   loadFontSize();
   renderAll();
   openCcChooser();
+  // Background sync from the Pace gist — non-blocking, updates the chooser when fresh data lands.
+  setTimeout(() => { syncFromGist(true); }, 200);
 })();
 
 function persist() {
@@ -973,7 +989,7 @@ function switchTab(t) {
   if (t === 'export') renderExportSummary();
   if (t === 'labels') renderLabelsTab();
   if (t === 'calc') initCalcTab();
-  if (t === 'setup') { renderCcSelect(); renderCcMgmtList(); }
+  if (t === 'setup') { renderCcSelect(); renderCcMgmtList(); updateSyncStatus(); }
 }
 
 // ITEM LIST (Count tab) ────────────────────────────────────────
@@ -1805,6 +1821,92 @@ const F12_ALL_SCRIPT = "(async function(){\n" +
 "  alert(msg);\n" +
 "})();";
 
+// F12 SYNC script — scrapes ALL CCs and pushes the combined CSV directly to the configured GitHub Gist.
+// On first run, prompts for a Personal Access Token (gist scope) and saves it in Pace-domain localStorage.
+const F12_SYNC_SCRIPT = "(async function(){\n" +
+"  var GIST_ID = 'dd6dd78a9c1644f0d5dd2ccd376bf366';\n" +
+"  var FILENAME = 'cycle_count.csv';\n" +
+"  var PAT_KEY  = 'ee_gh_pat';\n" +
+"  var ccIds = ['5057','5078','5085','5086','5088'];\n" +
+"  var pat = '';\n" +
+"  try { pat = localStorage.getItem(PAT_KEY) || ''; } catch(e){}\n" +
+"  if (!pat) {\n" +
+"    pat = prompt('Paste your GitHub Personal Access Token (gist scope). Saved in this browser only — never sent anywhere except api.github.com.');\n" +
+"    if (!pat) { alert('Cancelled — no PAT provided.'); return; }\n" +
+"    pat = pat.trim();\n" +
+"    try { localStorage.setItem(PAT_KEY, pat); } catch(e){}\n" +
+"  }\n" +
+"  function strip(s){ return (s==null?'':String(s)).trim(); }\n" +
+"  function descFromLink(div){ if(!div) return ''; var a=div.querySelector('a.objectTextLink'); var t=a?strip(a.textContent):''; var i=t.indexOf(' - '); return i>=0?strip(t.slice(i+3)):t; }\n" +
+"  function lotLabelFromLink(div){ if(!div) return ''; var a=div.querySelector('a.objectTextLink'); var t=a?strip(a.textContent):''; var r=t.indexOf(' (Rev'); return r>0?strip(t.slice(0,r)):t; }\n" +
+"  function extractRows(doc, ccId, rows){\n" +
+"    var trs = new Set();\n" +
+"    doc.querySelectorAll('input[name=\"items.primaryKey\"], input[name=\"lots.primaryKey\"]').forEach(function(inp){ var tr=inp.closest('tr'); if(tr) trs.add(tr); });\n" +
+"    var count = 0;\n" +
+"    trs.forEach(function(tr){\n" +
+"      var isLot = !!tr.querySelector('input[name=\"lots.primaryKey\"]');\n" +
+"      var itemCode='', location='', bin='', lot='', lotLabel='', desc='', qty=0, uom='';\n" +
+"      if (isLot) {\n" +
+"        var iDiv = tr.querySelector('[name=\"lots.itemCode\"]'); itemCode = iDiv ? strip(iDiv.getAttribute('data-selected-value')) : ''; desc = descFromLink(iDiv);\n" +
+"        var lInp = tr.querySelector('input[name=\"lots.invLoc_hidden\"]'); if (lInp) location = strip(lInp.value);\n" +
+"        if (!location) { var lDiv = tr.querySelector('[name=\"lots.inventoryLocation\"]'); location = lDiv ? strip(lDiv.getAttribute('data-selected-value')) : ''; }\n" +
+"        var bInp = tr.querySelector('input[name=\"lots.invBin_hidden\"]'); if (bInp) bin = strip(bInp.value);\n" +
+"        if (!bin) { var bDiv = tr.querySelector('[name=\"lots.inventoryBin\"]'); var bv = bDiv ? strip(bDiv.getAttribute('data-selected-value')) : ''; bin = bv.indexOf(':') >= 0 ? bv.split(':').slice(1).join(':') : bv; }\n" +
+"        var lotDiv = tr.querySelector('[name=\"lots.lot\"]'); lot = lotDiv ? strip(lotDiv.getAttribute('data-selected-value')) : ''; lotLabel = lotLabelFromLink(lotDiv);\n" +
+"        var qDiv = tr.querySelector('[name=\"qtyOnHand.quantityRemaining\"]'); if (qDiv) qty = parseFloat(qDiv.getAttribute('data-raw-value') || strip(qDiv.textContent) || '0') || 0;\n" +
+"        var uDiv = tr.querySelector('[name=\"qtyUom\"]'); if (uDiv) uom = strip(uDiv.getAttribute('data-raw-value') || uDiv.textContent);\n" +
+"      } else {\n" +
+"        var pkInp = tr.querySelector('input[name=\"items.primaryKey\"]'); var pk = pkInp ? (pkInp.value || pkInp.getAttribute('data-raw-value') || '') : '';\n" +
+"        var parts = pk.split(':'); location = parts[0] || ''; bin = parts[1] || ''; itemCode = parts[2] || '';\n" +
+"        var qInp = tr.querySelector('[name*=\"qtyOnHand\"]'); if (qInp) qty = parseFloat(qInp.getAttribute('data-raw-value') || qInp.value || strip(qInp.textContent) || '0') || 0;\n" +
+"        var uInp = tr.querySelector('[name*=\"qtyUom\"], [name=\"qtyUom\"]'); if (uInp) uom = strip(uInp.getAttribute('data-selected-value') || uInp.value || uInp.textContent);\n" +
+"        desc = descFromLink(tr.querySelector('[name=\"items.itemCode\"]'));\n" +
+"      }\n" +
+"      if (!itemCode) return;\n" +
+"      rows.push([ccId, itemCode, desc, location, bin, lot, lotLabel, qty, uom]);\n" +
+"      count++;\n" +
+"    });\n" +
+"    return count;\n" +
+"  }\n" +
+"  var rows = [['Cycle Count','Item Number','Description','Location','Bin','Lot ID','Lot Label','Qty On Hand','UOM']];\n" +
+"  var failed = [], summary = [];\n" +
+"  for (var i = 0; i < ccIds.length; i++) {\n" +
+"    var ccId = ccIds[i];\n" +
+"    var url = '/epace/company:public/object/CycleCount/detail/' + ccId;\n" +
+"    console.log('[sync] fetching ' + url);\n" +
+"    try {\n" +
+"      var res = await fetch(url, { credentials: 'include' });\n" +
+"      if (!res.ok) { failed.push(ccId + ' (HTTP ' + res.status + ')'); continue; }\n" +
+"      var doc = new DOMParser().parseFromString(await res.text(), 'text/html');\n" +
+"      summary.push('CC ' + ccId + ': ' + extractRows(doc, ccId, rows) + ' rows');\n" +
+"    } catch (err) { failed.push(ccId + ' (' + err.message + ')'); }\n" +
+"  }\n" +
+"  if (rows.length <= 1) { alert('No rows scraped. Failed: ' + (failed.join(', ') || '(none)')); return; }\n" +
+"  var csv = rows.map(function(r){ return r.map(function(c){ return '\"' + String(c==null?'':c).replace(/\"/g,'\"\"') + '\"'; }).join(','); }).join('\\n');\n" +
+"  console.log('[sync] uploading ' + csv.length + ' bytes to gist ' + GIST_ID);\n" +
+"  try {\n" +
+"    var body = {}; body[FILENAME] = { content: csv };\n" +
+"    var up = await fetch('https://api.github.com/gists/' + GIST_ID, {\n" +
+"      method: 'PATCH',\n" +
+"      headers: { 'Authorization': 'Bearer ' + pat, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },\n" +
+"      body: JSON.stringify({ files: body })\n" +
+"    });\n" +
+"    if (!up.ok) {\n" +
+"      var t = await up.text();\n" +
+"      if (up.status === 401 || up.status === 403) { try { localStorage.removeItem(PAT_KEY); } catch(e){} alert('Gist auth rejected (HTTP ' + up.status + '). Cleared saved PAT — re-run and paste a fresh one.\\n\\n' + t); }\n" +
+"      else alert('Gist upload failed: HTTP ' + up.status + '\\n\\n' + t);\n" +
+"      return;\n" +
+"    }\n" +
+"    var msg = 'Synced to gist:\\n\\n' + summary.join('\\n') + '\\n\\nTotal: ' + (rows.length - 1) + ' rows';\n" +
+"    if (failed.length) msg += '\\n\\nFailed: ' + failed.join(', ');\n" +
+"    msg += '\\n\\nThe warehouse app fetches this on next open (or via Sync Now).';\n" +
+"    console.log(msg);\n" +
+"    alert(msg);\n" +
+"  } catch (err) {\n" +
+"    alert('Network error pushing to gist: ' + err.message);\n" +
+"  }\n" +
+"})();";
+
 // DRAG-AND-DROP CSV ZONE ─────────────────────────────────────
 function onDropZoneOver(e) {
   e.preventDefault();
@@ -1840,6 +1942,7 @@ window.addEventListener('drop',     e => { if (e.dataTransfer && e.dataTransfer.
 
 function copyF12Script() { copyTextToClipboard(F12_SCRIPT, 'Single-CC export script copied — paste in Pace F12 console'); }
 function copyF12AllScript() { copyTextToClipboard(F12_ALL_SCRIPT, 'ALL-CCs export script copied — paste in Pace F12 console'); }
+function copyF12SyncScript() { copyTextToClipboard(F12_SYNC_SCRIPT, 'SYNC script copied — paste in Pace F12 console'); }
 function copyF12FillScript() { copyTextToClipboard(F12_FILL_SCRIPT, 'Fill script copied — paste in Pace F12 console'); }
 function copyTextToClipboard(text, okMsg) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2177,6 +2280,93 @@ function commitImport() {
   renderAll();
   switchTab('count');
   showToast('CC ' + ccId + ' loaded — ' + Object.keys(cycleCounts[ccId].items).length + ' items');
+}
+
+// LIVE SYNC FROM GIST ─────────────────────────────────────────
+const PACE_DATA_URL = 'https://gist.githubusercontent.com/endlessedge1997/dd6dd78a9c1644f0d5dd2ccd376bf366/raw/cycle_count.csv';
+
+function updateSyncStatus(msg) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  if (msg) { el.textContent = msg; return; }
+  let info = null;
+  try { info = JSON.parse(localStorage.getItem('pcc_lastSync') || 'null'); } catch(e) {}
+  if (!info) { el.textContent = 'Not synced yet — tap Sync Now'; return; }
+  const ago = Math.floor((Date.now() - info.at) / 60000);
+  const agoStr = ago < 1 ? 'just now' : ago < 60 ? ago + ' min ago' : ago < 1440 ? Math.floor(ago/60) + ' hr ago' : Math.floor(ago/1440) + ' days ago';
+  el.textContent = '✓ Last sync ' + agoStr + ' (' + new Date(info.at).toLocaleString() + ') · ' + info.ccCount + ' CCs · ' + info.totalRows + ' rows';
+}
+
+async function syncFromGist(silent) {
+  if (!silent) updateSyncStatus('Syncing from Pace data…');
+  try {
+    const res = await fetch(PACE_DATA_URL + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const csvText = await res.text();
+    const rows = parseCsv(csvText);
+    if (rows.length < 2) throw new Error('Gist CSV looks empty');
+    const header = rows[0];
+    const cols = detectColumns(header);
+    if (cols.itemNum === undefined) throw new Error('Synced CSV missing Item Number column');
+
+    const byCc = {};
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (row.length === 1 && !row[0]) continue;
+      const num = String(row[cols.itemNum] || '').trim();
+      if (!num) continue;
+      const desc = cols.desc !== undefined ? String(row[cols.desc] || '').trim() : '';
+      const location = cols.location !== undefined ? String(row[cols.location] || '').trim() : '';
+      const binRaw = cols.bin !== undefined ? String(row[cols.bin] || '').trim() : '';
+      const lot = cols.lot !== undefined ? String(row[cols.lot] || '').trim() : '';
+      const lotLabel = cols.lotLabel !== undefined ? String(row[cols.lotLabel] || '').trim() : '';
+      const oh = cols.oh !== undefined ? (parseFloat(row[cols.oh]) || 0) : 0;
+      const uom = cols.uom !== undefined ? String(row[cols.uom] || '').trim() : 'EA';
+      const ccVal = cols.cycleCount !== undefined ? String(row[cols.cycleCount] || '').trim() : '';
+      const binLabel = ((location ? location + ' ' : '') + binRaw).trim() || 'UNASSIGNED';
+      const ccKey = ccVal || '__SINGLE__';
+      if (!byCc[ccKey]) byCc[ccKey] = {};
+      const items = byCc[ccKey];
+      if (!items[num]) items[num] = { desc: desc || num, bins: [] };
+      if (desc && !items[num].desc) items[num].desc = desc;
+      const ex = items[num].bins.findIndex(b => b.bin === binLabel && (b.lot||'') === lot);
+      const binEntry = { bin: binLabel, lot, lotLabel, oh, uom: uom || 'EA' };
+      if (ex >= 0) items[num].bins[ex] = Object.assign({}, items[num].bins[ex], binEntry);
+      else items[num].bins.push(binEntry);
+    }
+
+    const ccKeys = Object.keys(byCc).filter(k => k !== '__SINGLE__');
+    if (!ccKeys.length) throw new Error('No Cycle Count column or no rows with CC IDs');
+    let totalRows = 0;
+    ccKeys.forEach(id => {
+      const items = byCc[id];
+      const existing = cycleCounts[id];
+      const seedName = (typeof SEED_CCS !== 'undefined' && SEED_CCS[id]) ? SEED_CCS[id].name : null;
+      cycleCounts[id] = {
+        id,
+        name: (existing && existing.name) || seedName || ('Cycle Count ' + id),
+        items,
+        importedAt: Date.now(),
+        finalizedAt: existing ? existing.finalizedAt : undefined,
+      };
+      totalRows += Object.values(items).reduce((a,v) => a + v.bins.length, 0);
+    });
+    persist();
+    try { localStorage.setItem('pcc_lastSync', JSON.stringify({ at: Date.now(), ccCount: ccKeys.length, totalRows })); } catch(e) {}
+    renderAll();
+    updateSyncStatus();
+    return { ok: true, ccCount: ccKeys.length, totalRows };
+  } catch (err) {
+    console.warn('Sync failed:', err);
+    updateSyncStatus('⚠ Sync failed: ' + err.message);
+    return { ok: false, err: err.message };
+  }
+}
+
+async function syncNow() {
+  const result = await syncFromGist(false);
+  if (result.ok) showToast('Synced ' + result.ccCount + ' CCs · ' + result.totalRows + ' rows');
+  else showToast('Sync failed: ' + result.err, 'err');
 }
 
 // FINALIZE / RESETS ────────────────────────────────────────
