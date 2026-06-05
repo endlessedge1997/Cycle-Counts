@@ -147,6 +147,10 @@ body.fs-3 .pill{font-size:13px}
 .pill .pill-lbl{color:var(--muted);font-size:9px}
 .pill.cc-pill{border-color:var(--accent2);color:var(--accent)}
 .pill.count-pill{background:var(--accent2);color:#fff;border-color:var(--accent)}
+.pill.sync-pill{background:var(--surface2);color:var(--text);border-color:var(--border)}
+.pill.sync-pill.fresh{background:var(--green);color:#000;border-color:var(--green)}
+.pill.sync-pill.stale{background:var(--gold);color:#000;border-color:var(--gold)}
+.pill.sync-pill.bad{background:var(--red);color:#fff;border-color:var(--red)}
 
 /* TABS */
 .tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -387,6 +391,10 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
     </div>
     <div class="pill count-pill" title="Tap to view & export counted items" onclick="openCountedList()" style="cursor:pointer">
       <span id="counterText">0/0</span>
+    </div>
+    <div class="pill sync-pill" id="syncPill" onclick="syncNow()" title="Tap to pull latest Pace data" style="cursor:pointer">
+      <span class="pill-lbl">SYNC</span>
+      <span id="syncPillTime">—</span>
     </div>
   </div>
 </header>
@@ -653,71 +661,111 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 <!-- SETUP TAB -->
 <div class="page" id="page-setup">
 
-  <div class="card" style="border-color:var(--accent)">
-    <div class="card-title" style="color:var(--accent)">Active Cycle Count</div>
-    <select id="ccSelect" onchange="switchActiveCC(this.value)" style="margin-bottom:10px"></select>
-    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-top:4px">
-      Switch which cycle count the Count tab is showing. Counts are kept per cycle count.
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!--  COUNTER SECTION                                              -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div style="background:linear-gradient(90deg,var(--green) 0%,transparent 100%);padding:6px 12px;border-radius:6px;margin-bottom:8px">
+    <div style="font-family:var(--head);font-weight:700;font-size:16px;letter-spacing:2px;color:#000">👤 FOR THE COUNTER (Warehouse)</div>
+  </div>
+
+  <div class="card" style="border-color:var(--green)">
+    <div class="card-title" style="color:var(--green)">How to count a cycle count</div>
+    <ol style="margin:0 0 0 18px;padding:0;font-size:13px;line-height:1.7;color:var(--text)">
+      <li>Tap the <strong>CC</strong> pill at top → pick the cycle count you're counting (or use the chooser that pops up when the app opens).</li>
+      <li>Go to <strong>📋 Count</strong> tab. Scan a barcode (or tap a row). The matching item card opens.</li>
+      <li>If the item has one row, the keypad opens automatically. If multiple rows, tap the one you're at.</li>
+      <li>Type the quantity on the keypad, tap <strong>✔ LOG</strong>.</li>
+      <li>Continue until all rows are counted. The header pill shows <strong>X/Y</strong> progress.</li>
+      <li>When done, go to <strong>📤 Export</strong> tab → fill the manager's email → tap <strong>Email Current CSV</strong>. The email opens with the count attached. Send.</li>
+    </ol>
+  </div>
+
+  <div class="card" style="border-color:var(--green)">
+    <div class="card-title" style="color:var(--green)">Active cycle count</div>
+    <select id="ccSelect" onchange="switchActiveCC(this.value)" style="margin-bottom:8px"></select>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5">
+      Pick which cycle count the Count tab is showing. Your counts are saved separately per CC.
     </p>
   </div>
 
   <div class="card" style="border-color:var(--green)">
-    <div class="card-title" style="color:var(--green)">🔄 Live Sync from Pace</div>
+    <div class="card-title" style="color:var(--green)">🔄 Pull latest data from Pace</div>
     <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">
-      Pulls the latest combined CSV from the configured GitHub Gist and refreshes all cycle counts. Your in-progress counts and history are preserved.
+      The app auto-syncs when it opens. Tap below to force a refresh anytime — for example if the manager just pushed new Pace data. Your in-progress counts and history are kept.
     </p>
     <div id="syncStatus" style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:10px;letter-spacing:.5px;word-break:break-word">Not synced yet</div>
-    <button class="btn btn-green" onclick="syncNow()" style="margin:0">⬇ Sync Now from Pace</button>
+    <button class="btn btn-green" onclick="syncNow()" style="margin:0">⬇ Sync Now</button>
+  </div>
 
-    <div style="margin-top:14px;padding-top:10px;border-top:1px dashed var(--border)">
-      <div style="font-family:var(--head);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:6px">Manager: Push Pace data → Gist (2 steps)</div>
-      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">
-        Step 1: in Pace's F12 console, run the <em>ALL-CCs F12 Script</em> (from the Import card below). It downloads a combined CSV to your computer.
-        <br><br>
-        Step 2: back here, tap <em>Upload CSV to Gist</em>, pick that downloaded file. First time, you'll be prompted for your GitHub Personal Access Token — saved in this browser only.
-      </p>
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!--  MANAGER SECTION                                              -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div style="background:linear-gradient(90deg,var(--accent2) 0%,transparent 100%);padding:6px 12px;border-radius:6px;margin:24px 0 8px">
+    <div style="font-family:var(--head);font-weight:700;font-size:16px;letter-spacing:2px;color:#fff">👔 FOR THE MANAGER</div>
+  </div>
+
+  <div class="card" style="border-color:var(--accent)">
+    <div class="card-title" style="color:var(--accent)">A. Push fresh Pace data to all warehouse phones</div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
+      Run this any time Pace inventory changes. Two steps: scrape Pace → upload to the gist. All warehouse phones see the new data on next open (or via Sync Now).
+    </p>
+    <div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px;margin-bottom:10px;font-size:12px;line-height:1.6">
+      <strong style="color:var(--accent)">STEP 1 — Scrape Pace on a computer:</strong>
+      <ol style="margin:6px 0 8px 18px;padding:0">
+        <li>Open <strong>any Pace page</strong>, logged in.</li>
+        <li>Press <strong>F12</strong>, click <strong>Console</strong>.</li>
+        <li>Tap the button below to copy the script.</li>
+        <li>Paste in the Pace console, press <strong>Enter</strong>.</li>
+        <li>A combined CSV (all 5 CCs) downloads to your computer.</li>
+      </ol>
+      <button class="btn btn-primary" onclick="copyF12AllScript()" style="margin:0">📋 Copy ALL-CCs F12 Script</button>
+    </div>
+    <div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px;font-size:12px;line-height:1.6">
+      <strong style="color:var(--accent)">STEP 2 — Upload that CSV to the gist:</strong>
+      <ol style="margin:6px 0 8px 18px;padding:0">
+        <li>Tap the button below.</li>
+        <li>Pick the CSV you just downloaded (likely in your Downloads folder).</li>
+        <li>First time only: a prompt asks for your GitHub Personal Access Token. Paste it. Saved here only.</li>
+        <li>Wait for "✓ Uploaded + synced…" status.</li>
+      </ol>
       <input type="file" id="gistUploadFile" accept=".csv,text/csv,text/plain" style="display:none" onchange="uploadCsvToGist(event)">
       <button class="btn btn-primary" onclick="document.getElementById('gistUploadFile').click()" style="margin:0">📤 Upload CSV to Gist</button>
-      <button class="btn btn-ghost" onclick="clearStoredPat()" style="margin-top:6px;padding:6px 10px;font-size:10px">🗑 Clear saved PAT</button>
-    </div>
-
-    <div style="margin-top:14px;padding-top:10px;border-top:1px dashed var(--border);font-size:10px;color:var(--muted);line-height:1.5">
-      <em>Alternative (only works if Pace allows outbound to api.github.com):</em>
-      <br>
-      <button class="btn btn-ghost" onclick="copyF12SyncScript()" style="margin-top:4px;padding:6px 10px;font-size:10px">📋 Copy one-step SYNC F12 Script</button>
+      <button class="btn btn-ghost" onclick="clearStoredPat()" style="margin-top:6px;padding:6px 10px;font-size:10px">🗑 Clear saved PAT (if rotating token)</button>
     </div>
   </div>
 
-  <div class="card" style="border-color:var(--gold)">
-    <div class="card-title" style="color:var(--gold)">Import Cycle Count CSV (manual)</div>
-
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px;font-size:11px;color:var(--text);line-height:1.6">
-      <div style="font-family:var(--head);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:6px">Step 1 — Get the CSV from Pace</div>
-      <ol style="margin:0 0 8px 22px;padding:0;color:var(--muted);font-size:11px">
-        <li>Open <strong style="color:var(--text)">any Pace page</strong> on a computer (you must be logged in)</li>
-        <li>Press <strong style="color:var(--text)">F12</strong>, click the <strong style="color:var(--text)">Console</strong> tab</li>
-        <li>Tap <em>Copy ALL-CCs F12 Script</em> below, paste into the console, press <strong style="color:var(--text)">Enter</strong></li>
-        <li>One CSV with all pre-loaded cycle counts downloads automatically</li>
-        <li>Move that CSV to this device (AirDrop / email / iCloud) and import in Step 2</li>
+  <div class="card" style="border-color:var(--accent)">
+    <div class="card-title" style="color:var(--accent)">B. Apply counter's results back to Pace</div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
+      After the counter emails you their Email Current CSV, push the values into the matching Pace cycle count.
+    </p>
+    <div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px;font-size:12px;line-height:1.6">
+      <ol style="margin:0 0 8px 18px;padding:0">
+        <li>Open Pace in a desktop browser. Navigate to the <strong>same CC's detail page</strong> as the counter's CSV (e.g. CC 5085).</li>
+        <li>Press <strong>F12</strong>, click <strong>Console</strong>.</li>
+        <li>Tap the button below to copy the Fill script.</li>
+        <li>Paste in the Pace console, press <strong>Enter</strong>. A white overlay dialog appears.</li>
+        <li>Open the counter's email → select the CSV block (from <code>"Cycle Count","Item Number",…</code> through the last row) → copy.</li>
+        <li>Paste into the dialog's text area, click <strong>Fill Counts</strong>.</li>
+        <li>Review the filled values in Pace. Click <strong>Save</strong>.</li>
       </ol>
-      <button class="btn btn-primary" onclick="copyF12AllScript()" style="margin-top:4px">📋 Copy ALL-CCs F12 Script</button>
-      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);font-size:10px;color:var(--muted)">
-        Need to refresh just one CC? Use the <em>Single-CC script</em> from a specific CC's detail page:
-        <button class="btn btn-ghost" onclick="copyF12Script()" style="margin-top:4px;padding:6px 10px;font-size:10px">📋 Copy Single-CC F12 Script</button>
-      </div>
+      <button class="btn btn-primary" onclick="copyF12FillScript()" style="margin:0">📋 Copy Pace Fill Script</button>
     </div>
+  </div>
 
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px;font-size:11px;color:var(--text);line-height:1.6">
-      <div style="font-family:var(--head);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:6px">Step 2 — Load the CSV here</div>
-      <div style="color:var(--muted);font-size:11px;margin-bottom:4px">
-        Import refreshes <strong style="color:var(--text)">items, bins, and Pace on-hand quantities</strong> for this cycle count.
-      </div>
-      <div style="color:var(--green);font-size:11px">
-        ✓ Your existing counts in this session stay safe — they're kept in local cache.
-      </div>
-    </div>
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!--  ADVANCED / RARELY USED                                       -->
+  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div style="background:linear-gradient(90deg,var(--muted) 0%,transparent 100%);padding:6px 12px;border-radius:6px;margin:24px 0 8px">
+    <div style="font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:2px;color:#fff">⚙ ADVANCED / RARELY USED</div>
+  </div>
 
-    <label class="field-label">Cycle Count ID (e.g. 5085)</label>
+  <div class="card" style="border-color:var(--gold)">
+    <div class="card-title" style="color:var(--gold)">Manual CSV import (skip gist)</div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
+      For one-off imports without going through the gist sync. Drop a CSV here to refresh one or all CCs. Auto-detects whether it's a single-CC or combined CSV.
+    </p>
+    <label class="field-label">Cycle Count ID (only used when CSV has no Cycle Count column)</label>
     <input type="text" id="newCcId" placeholder="5085" style="margin-bottom:10px">
     <input type="file" id="csvFileInput" accept=".csv,text/csv,text/plain" style="display:none" onchange="handleCsvFile(event)">
     <div id="csvDropZone" class="drop-zone"
@@ -740,22 +788,15 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
     </div>
   </div>
 
-  <div class="card" style="border-color:var(--accent)">
-    <div class="card-title" style="color:var(--accent)">Send Counts Back to Pace</div>
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px;font-size:11px;color:var(--text);line-height:1.6">
-      <ol style="margin:0 0 8px 22px;padding:0;color:var(--muted);font-size:11px">
-        <li>Open the cycle count detail page in Pace on a computer</li>
-        <li>Press <strong style="color:var(--text)">F12</strong>, click the <strong style="color:var(--text)">Console</strong> tab</li>
-        <li>Tap <em>Copy Pace Fill Script</em> below, paste into the console, press <strong style="color:var(--text)">Enter</strong></li>
-        <li>A prompt appears — paste the employee's CSV (from email) into it</li>
-        <li>Counts populate in the Pace grid. Review, then Save in Pace</li>
-      </ol>
-      <button class="btn btn-primary" onclick="copyF12FillScript()" style="margin-top:4px">📋 Copy Pace Fill Script</button>
-    </div>
+  <div class="card">
+    <div class="card-title">Other F12 scripts</div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">Backup tools — rarely needed.</p>
+    <button class="btn btn-ghost" onclick="copyF12Script()" style="margin-top:0;padding:8px 12px;font-size:11px">📋 Single-CC F12 Script (refresh one CC only)</button>
+    <button class="btn btn-ghost" onclick="copyF12SyncScript()" style="margin-top:6px;padding:8px 12px;font-size:11px">📋 One-step SYNC script (may fail if Pace blocks api.github.com)</button>
   </div>
 
   <div class="card">
-    <div class="card-title">Manage Cycle Counts</div>
+    <div class="card-title">Manage cycle counts</div>
     <div id="ccMgmtList" style="font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.8"></div>
   </div>
 
@@ -900,9 +941,12 @@ const expandedCards = new Set();
   loadTheme();
   loadFontSize();
   renderAll();
+  updateSyncStatus();
   openCcChooser();
   // Background sync from the Pace gist — non-blocking, updates the chooser when fresh data lands.
   setTimeout(() => { syncFromGist(true); }, 200);
+  // Refresh the "X min ago" display every minute so it stays accurate without a reload.
+  setInterval(updateSyncStatus, 60000);
 })();
 
 function persist() {
@@ -2300,14 +2344,35 @@ const PACE_DATA_URL = 'https://gist.githubusercontent.com/endlessedge1997/dd6dd7
 
 function updateSyncStatus(msg) {
   const el = document.getElementById('syncStatus');
-  if (!el) return;
-  if (msg) { el.textContent = msg; return; }
+  const pill = document.getElementById('syncPill');
+  const pillTime = document.getElementById('syncPillTime');
+  if (msg) {
+    if (el) el.textContent = msg;
+    if (pillTime) pillTime.textContent = msg.length > 16 ? msg.slice(0, 16) + '…' : msg;
+    if (pill) { pill.classList.remove('fresh','stale','bad'); }
+    return;
+  }
   let info = null;
   try { info = JSON.parse(localStorage.getItem('pcc_lastSync') || 'null'); } catch(e) {}
-  if (!info) { el.textContent = 'Not synced yet — tap Sync Now'; return; }
-  const ago = Math.floor((Date.now() - info.at) / 60000);
-  const agoStr = ago < 1 ? 'just now' : ago < 60 ? ago + ' min ago' : ago < 1440 ? Math.floor(ago/60) + ' hr ago' : Math.floor(ago/1440) + ' days ago';
-  el.textContent = '✓ Last sync ' + agoStr + ' (' + new Date(info.at).toLocaleString() + ') · ' + info.ccCount + ' CCs · ' + info.totalRows + ' rows';
+  if (!info) {
+    if (el) el.textContent = 'Not synced yet — tap Sync Now';
+    if (pillTime) pillTime.textContent = 'never';
+    if (pill) { pill.classList.remove('fresh','stale'); pill.classList.add('bad'); }
+    return;
+  }
+  const ageMin = Math.floor((Date.now() - info.at) / 60000);
+  const agoStr = ageMin < 1 ? 'just now'
+                : ageMin < 60 ? ageMin + 'm ago'
+                : ageMin < 1440 ? Math.floor(ageMin/60) + 'h ago'
+                : Math.floor(ageMin/1440) + 'd ago';
+  if (el) el.textContent = '✓ Last sync ' + agoStr + ' (' + new Date(info.at).toLocaleString() + ') · ' + info.ccCount + ' CCs · ' + info.totalRows + ' rows';
+  if (pillTime) pillTime.textContent = agoStr;
+  if (pill) {
+    pill.classList.remove('fresh','stale','bad');
+    if (ageMin < 60) pill.classList.add('fresh');           // < 1 hour = green
+    else if (ageMin < 1440) pill.classList.add('stale');    // < 24 hours = amber
+    else pill.classList.add('bad');                          // > 1 day = red
+  }
 }
 
 async function syncFromGist(silent) {
