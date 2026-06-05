@@ -668,10 +668,23 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
     </p>
     <div id="syncStatus" style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:10px;letter-spacing:.5px;word-break:break-word">Not synced yet</div>
     <button class="btn btn-green" onclick="syncNow()" style="margin:0">⬇ Sync Now from Pace</button>
-    <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:10px;color:var(--muted);line-height:1.5">
-      <strong style="color:var(--text)">Manager:</strong> push fresh Pace data to the gist with the <em>SYNC F12 Script</em> below. Run it from any logged-in Pace page; it scrapes all CCs and uploads in one shot.
-      <br><br>
-      <button class="btn btn-primary" onclick="copyF12SyncScript()" style="margin:0;padding:8px 12px;font-size:11px">📋 Copy SYNC F12 Script (Pace → Gist)</button>
+
+    <div style="margin-top:14px;padding-top:10px;border-top:1px dashed var(--border)">
+      <div style="font-family:var(--head);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:6px">Manager: Push Pace data → Gist (2 steps)</div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">
+        Step 1: in Pace's F12 console, run the <em>ALL-CCs F12 Script</em> (from the Import card below). It downloads a combined CSV to your computer.
+        <br><br>
+        Step 2: back here, tap <em>Upload CSV to Gist</em>, pick that downloaded file. First time, you'll be prompted for your GitHub Personal Access Token — saved in this browser only.
+      </p>
+      <input type="file" id="gistUploadFile" accept=".csv,text/csv,text/plain" style="display:none" onchange="uploadCsvToGist(event)">
+      <button class="btn btn-primary" onclick="document.getElementById('gistUploadFile').click()" style="margin:0">📤 Upload CSV to Gist</button>
+      <button class="btn btn-ghost" onclick="clearStoredPat()" style="margin-top:6px;padding:6px 10px;font-size:10px">🗑 Clear saved PAT</button>
+    </div>
+
+    <div style="margin-top:14px;padding-top:10px;border-top:1px dashed var(--border);font-size:10px;color:var(--muted);line-height:1.5">
+      <em>Alternative (only works if Pace allows outbound to api.github.com):</em>
+      <br>
+      <button class="btn btn-ghost" onclick="copyF12SyncScript()" style="margin-top:4px;padding:6px 10px;font-size:10px">📋 Copy one-step SYNC F12 Script</button>
     </div>
   </div>
 
@@ -2367,6 +2380,82 @@ async function syncNow() {
   const result = await syncFromGist(false);
   if (result.ok) showToast('Synced ' + result.ccCount + ' CCs · ' + result.totalRows + ' rows');
   else showToast('Sync failed: ' + result.err, 'err');
+}
+
+const GIST_ID = 'dd6dd78a9c1644f0d5dd2ccd376bf366';
+const GIST_FILENAME = 'cycle_count.csv';
+
+function getStoredPat() {
+  try { return localStorage.getItem('pcc_gh_pat') || ''; } catch(e) { return ''; }
+}
+function setStoredPat(p) { try { localStorage.setItem('pcc_gh_pat', p); } catch(e) {} }
+function clearStoredPat() {
+  if (!confirm('Forget the saved GitHub Personal Access Token? You will be prompted for it next time you upload.')) return;
+  try { localStorage.removeItem('pcc_gh_pat'); } catch(e) {}
+  showToast('Saved PAT cleared');
+}
+
+async function uploadCsvToGist(event) {
+  const file = event && event.target && event.target.files && event.target.files[0];
+  if (!file) return;
+  event.target.value = ''; // reset so re-picking same file fires again
+  // Read the file as text
+  const csvText = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result || ''));
+    r.onerror = () => reject(new Error('Could not read file'));
+    r.readAsText(file);
+  });
+  if (!csvText.trim()) { showToast('CSV file is empty', 'err'); return; }
+  // Quick sanity check — first line should look like our CSV header
+  if (csvText.split('\n')[0].toLowerCase().indexOf('item') < 0) {
+    if (!confirm('That file doesn\'t look like our cycle-count CSV (header missing "Item"). Upload anyway?')) return;
+  }
+  // Get or prompt for the PAT
+  let pat = getStoredPat();
+  if (!pat) {
+    pat = prompt('Paste your GitHub Personal Access Token (gist scope).\n\nIt is saved in this browser only and only sent to api.github.com.');
+    if (!pat) { showToast('No PAT — upload cancelled', 'err'); return; }
+    pat = pat.trim();
+    setStoredPat(pat);
+  }
+  updateSyncStatus('Uploading ' + csvText.length + ' bytes to gist…');
+  showToast('Uploading to gist…');
+  try {
+    const body = {};
+    body[GIST_FILENAME] = { content: csvText };
+    const res = await fetch('https://api.github.com/gists/' + GIST_ID, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'Bearer ' + pat,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ files: body })
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      if (res.status === 401 || res.status === 403) {
+        try { localStorage.removeItem('pcc_gh_pat'); } catch(e) {}
+        updateSyncStatus('⚠ Gist auth rejected (' + res.status + '). PAT cleared. Re-upload with a fresh token.');
+        showToast('Auth rejected — paste new PAT next time', 'err');
+      } else {
+        updateSyncStatus('⚠ Upload failed: HTTP ' + res.status);
+        showToast('Upload failed: HTTP ' + res.status, 'err');
+      }
+      console.warn('Gist PATCH failed:', res.status, errBody);
+      return;
+    }
+    showToast('Uploaded to gist ✓');
+    // Now immediately pull the new data into this app too, so this device is in sync.
+    const result = await syncFromGist(false);
+    if (result.ok) {
+      updateSyncStatus('✓ Uploaded + synced ' + result.ccCount + ' CCs · ' + result.totalRows + ' rows · just now');
+    }
+  } catch (err) {
+    updateSyncStatus('⚠ Network error: ' + err.message);
+    showToast('Network error: ' + err.message, 'err');
+  }
 }
 
 // FINALIZE / RESETS ────────────────────────────────────────
