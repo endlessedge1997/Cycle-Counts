@@ -998,7 +998,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = 'TEST-2026-06-09-1034';
+const APP_VERSION = 'TEST-2026-06-09-1110';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1032,6 +1032,18 @@ let noteCtx = null;        // { ccId, itemNum } for the open note modal
 let addBinCtx = null;      // itemNum for the open Add/Transfer Bin modal
 let histCcFilter = 'ALL';
 const expandedCards = new Set();
+// Per-line font/color editor state — declared here (not lower) so init()'s loadFontPrefs() never hits a TDZ.
+let fontPrefs = {};
+const FONT_ELEMENTS = [
+  { key:'num',    label:'Item number (#)',    sel:'#itemList .ic-num',      def:12, dcolor:'#d4820a', sample:'#10036' },
+  { key:'desc',   label:'Item description',   sel:'#itemList .ic-desc',     def:15, dcolor:'#000000', sample:'Double Wall Cardboard' },
+  { key:'bin',    label:'Bin location',       sel:'#itemList .bin-loc',     def:12, dcolor:'#0072ff', sample:'CAROUSEL CAROUSEL' },
+  { key:'lot',    label:'Lot line',           sel:'#itemList .bin-lot',     def:11, dcolor:'#d4820a', sample:'LOT: 040126-ROLL05' },
+  { key:'oh',     label:'Pace on-hand line',  sel:'#itemList .bin-oh',      def:10, dcolor:'#333333', sample:'Pace On Hand: 167 in' },
+  { key:'status', label:'Count status line',  sel:'#itemList .bin-status',  def:10, dcolor:'#333333', sample:'Not counted yet' },
+  { key:'qty',    label:'Counted qty (big)',  sel:'#itemList .bin-qty-big', def:20, dcolor:'#1a9e5c', sample:'167' },
+  { key:'note',   label:'Note line text',     sel:'#itemList .note-line .note-preview, #itemList .note-line .note-label', def:10, dcolor:'#000000', sample:'NOTE: damaged corner' }
+];
 
 (function init(){
   try { cycleCounts = JSON.parse(localStorage.getItem('pcc_cycleCounts') || '{}'); } catch(e) { cycleCounts = {}; }
@@ -3722,19 +3734,8 @@ function loadFontSize(){
 }
 
 // PER-LINE FONT & COLOR EDITOR ────────────────────────
-// fontPrefs[key] = { size:px, color:'#rrggbb' }. Applied via an injected <style> with
-// id-scoped selectors so they beat the light-mode high-contrast rule. Persists across syncs.
-let fontPrefs = {};
-const FONT_ELEMENTS = [
-  { key:'num',    label:'Item number (#)',    sel:'#itemList .ic-num',      def:12, dcolor:'#d4820a', sample:'#10036' },
-  { key:'desc',   label:'Item description',   sel:'#itemList .ic-desc',     def:15, dcolor:'#000000', sample:'Double Wall Cardboard' },
-  { key:'bin',    label:'Bin location',       sel:'#itemList .bin-loc',     def:12, dcolor:'#0072ff', sample:'CAROUSEL CAROUSEL' },
-  { key:'lot',    label:'Lot line',           sel:'#itemList .bin-lot',     def:11, dcolor:'#d4820a', sample:'LOT: 040126-ROLL05' },
-  { key:'oh',     label:'Pace on-hand line',  sel:'#itemList .bin-oh',      def:10, dcolor:'#333333', sample:'Pace On Hand: 167 in' },
-  { key:'status', label:'Count status line',  sel:'#itemList .bin-status',  def:10, dcolor:'#333333', sample:'Not counted yet' },
-  { key:'qty',    label:'Counted qty (big)',  sel:'#itemList .bin-qty-big', def:20, dcolor:'#1a9e5c', sample:'167' },
-  { key:'note',   label:'Note line text',     sel:'#itemList .note-line .note-preview, #itemList .note-line .note-label', def:10, dcolor:'#000000', sample:'NOTE: damaged corner' }
-];
+// (fontPrefs + FONT_ELEMENTS are declared at the top of the script with the other
+//  state vars, so init()/loadFontPrefs() can safely touch them — no TDZ.)
 function loadFontPrefs(){
   try { fontPrefs = JSON.parse(localStorage.getItem('pcc_fontPrefs') || '{}'); } catch(e) { fontPrefs = {}; }
   if (!fontPrefs || typeof fontPrefs !== 'object') fontPrefs = {};
