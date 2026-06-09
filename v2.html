@@ -143,6 +143,25 @@ body.fs-3 .progress-text{font-size:15px}
 body.fs-3 .card-title{font-size:15px}
 body.fs-3 .tab{font-size:16px}
 body.fs-3 .pill{font-size:13px}
+
+/* Larger levels — focus on the Count-screen lines (lot line included) plus nav. */
+body.fs-4 .ic-num{font-size:18px} body.fs-5 .ic-num{font-size:21px} body.fs-6 .ic-num{font-size:24px}
+body.fs-4 .ic-desc{font-size:24px} body.fs-5 .ic-desc{font-size:28px} body.fs-6 .ic-desc{font-size:33px}
+body.fs-4 .bin-loc{font-size:19px} body.fs-5 .bin-loc{font-size:23px} body.fs-6 .bin-loc{font-size:27px}
+body.fs-4 .bin-lot{font-size:18px} body.fs-5 .bin-lot{font-size:22px} body.fs-6 .bin-lot{font-size:26px}
+body.fs-4 .bin-oh,body.fs-4 .bin-status,body.fs-4 .bin-cta{font-size:17px} body.fs-5 .bin-oh,body.fs-5 .bin-status,body.fs-5 .bin-cta{font-size:20px} body.fs-6 .bin-oh,body.fs-6 .bin-status,body.fs-6 .bin-cta{font-size:23px}
+body.fs-4 .bin-qty-big{font-size:32px} body.fs-5 .bin-qty-big{font-size:38px} body.fs-6 .bin-qty-big{font-size:44px}
+body.fs-4 .note-line{font-size:14px} body.fs-5 .note-line{font-size:17px} body.fs-6 .note-line{font-size:20px}
+body.fs-4 .scan-banner input{font-size:28px} body.fs-5 .scan-banner input{font-size:32px} body.fs-6 .scan-banner input{font-size:36px}
+body.fs-4 .em-desc{font-size:30px} body.fs-5 .em-desc{font-size:34px} body.fs-6 .em-desc{font-size:38px}
+body.fs-4 .em-loc,body.fs-4 .em-oh,body.fs-4 .em-item,body.fs-4 .em-prior{font-size:16px} body.fs-5 .em-loc,body.fs-5 .em-oh,body.fs-5 .em-item,body.fs-5 .em-prior{font-size:18px} body.fs-6 .em-loc,body.fs-6 .em-oh,body.fs-6 .em-item,body.fs-6 .em-prior{font-size:20px}
+body.fs-4 .ccc-name{font-size:30px} body.fs-5 .ccc-name{font-size:34px} body.fs-6 .ccc-name{font-size:38px}
+body.fs-4 .tab{font-size:17px} body.fs-5 .tab{font-size:18px} body.fs-6 .tab{font-size:19px}
+
+/* Size chooser buttons */
+.sz-opt{display:block;width:100%;text-align:left;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);padding:14px 16px;margin-bottom:8px;cursor:pointer;font-family:var(--head);font-weight:700;letter-spacing:1px}
+.sz-opt.active{background:var(--accent2);color:#fff;border-color:var(--accent)}
+
 .pill{background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:4px 10px;font-family:var(--mono);font-size:10px;color:var(--text);letter-spacing:1px;cursor:pointer;display:flex;align-items:center;gap:6px}
 .pill .pill-lbl{color:var(--muted);font-size:9px}
 .pill.cc-pill{border-color:var(--accent2);color:var(--accent)}
@@ -972,24 +991,20 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <!-- FONT & COLOR EDITOR MODAL -->
 <div class="entry-overlay" id="fontEditorOverlay" onclick="if(event.target===this)closeFontEditor()">
-  <div class="entry-modal" style="border-top-color:var(--accent);max-width:480px">
+  <div class="entry-modal" style="border-top-color:var(--accent);max-width:440px">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
-      <div style="font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:1px;color:var(--accent)">Font &amp; Color Settings</div>
+      <div style="font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:1px;color:var(--accent)">Text Size</div>
       <button class="modal-close" onclick="closeFontEditor()" title="Close" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:34px;height:34px;font-size:18px;line-height:1;cursor:pointer;color:var(--text)">✕</button>
     </div>
-    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
-      Set the size and color of each line on the Count screen. Changes preview below and apply instantly. They stay until you reset — syncing never changes them.
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:12px">
+      Pick how big the text is on the Count screen. The setting sticks until you change it — syncing never resets it.
     </p>
-    <div style="margin-bottom:12px">
-      <div style="font-family:var(--head);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Overall size</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost" style="margin:0;flex:1" onclick="setFontSize(1)">A</button>
-        <button class="btn btn-ghost" style="margin:0;flex:1" onclick="setFontSize(2)">A+</button>
-        <button class="btn btn-ghost" style="margin:0;flex:1" onclick="setFontSize(3)">A++</button>
-      </div>
-    </div>
-    <div id="fontEditorBody"></div>
-    <button class="btn btn-red" style="margin-top:6px" onclick="resetAllFontPrefs()">↺ Reset all to default</button>
+    <button class="sz-opt" id="sz-1" onclick="setFontSize(1)">Normal</button>
+    <button class="sz-opt" id="sz-2" onclick="setFontSize(2)">Large</button>
+    <button class="sz-opt" id="sz-3" onclick="setFontSize(3)">Larger</button>
+    <button class="sz-opt" id="sz-4" onclick="setFontSize(4)">Extra Large</button>
+    <button class="sz-opt" id="sz-5" onclick="setFontSize(5)">Huge</button>
+    <button class="sz-opt" id="sz-6" onclick="setFontSize(6)">Giant</button>
   </div>
 </div>
 
@@ -998,7 +1013,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = 'TEST-2026-06-09-1110';
+const APP_VERSION = 'TEST-2026-06-09-1119';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3719,12 +3734,18 @@ function toggleTheme(){
   document.getElementById('themeBtn').textContent = isLight ? '🌙' : '☀️';
   try{ localStorage.setItem('pcc_theme', isLight ? 'light' : 'dark'); }catch(e){}
 }
+// TEXT SIZE (6 levels) ────────────────────────────────
 function setFontSize(level){
-  level = Math.max(1, Math.min(3, parseInt(level,10) || 1));
-  document.body.classList.remove('fs-1','fs-2','fs-3');
+  level = Math.max(1, Math.min(6, parseInt(level,10) || 1));
+  document.body.classList.remove('fs-1','fs-2','fs-3','fs-4','fs-5','fs-6');
   document.body.classList.add('fs-' + level);
   const btn = document.getElementById('fsBtn');
-  if (btn) btn.textContent = level === 1 ? 'A' : level === 2 ? 'A+' : 'A++';
+  if (btn) btn.textContent = 'A' + (level > 1 ? (level - 1) : '');
+  // Highlight the active option in the size chooser, if open.
+  for (let i = 1; i <= 6; i++) {
+    const o = document.getElementById('sz-' + i);
+    if (o) o.classList.toggle('active', i === level);
+  }
   try { localStorage.setItem('pcc_fs', String(level)); } catch(e){}
 }
 function loadFontSize(){
@@ -3732,83 +3753,22 @@ function loadFontSize(){
   try { level = parseInt(localStorage.getItem('pcc_fs') || '1', 10) || 1; } catch(e){}
   setFontSize(level);
 }
-
-// PER-LINE FONT & COLOR EDITOR ────────────────────────
-// (fontPrefs + FONT_ELEMENTS are declared at the top of the script with the other
-//  state vars, so init()/loadFontPrefs() can safely touch them — no TDZ.)
-function loadFontPrefs(){
-  try { fontPrefs = JSON.parse(localStorage.getItem('pcc_fontPrefs') || '{}'); } catch(e) { fontPrefs = {}; }
-  if (!fontPrefs || typeof fontPrefs !== 'object') fontPrefs = {};
-  applyFontPrefs();
-}
-function applyFontPrefs(){
-  let css = '';
-  FONT_ELEMENTS.forEach(function(el){
-    const p = fontPrefs[el.key];
-    if (!p) return;
-    let rule = '';
-    if (p.size)  rule += 'font-size:' + p.size + 'px !important;';
-    if (p.color) rule += 'color:' + p.color + ' !important;-webkit-text-fill-color:' + p.color + ' !important;';
-    if (rule) css += el.sel + '{' + rule + '}\n';
-  });
-  let style = document.getElementById('userFontStyle');
-  if (!style) { style = document.createElement('style'); style.id = 'userFontStyle'; document.head.appendChild(style); }
-  style.textContent = css;
-  try { localStorage.setItem('pcc_fontPrefs', JSON.stringify(fontPrefs)); } catch(e){}
-}
-function feDef(key){ const e = FONT_ELEMENTS.find(function(x){ return x.key === key; }); return e ? e.def : 12; }
 function openFontEditor(){
-  const host = document.getElementById('fontEditorBody');
-  if (!host) return;
-  host.innerHTML = FONT_ELEMENTS.map(function(el){
-    const p = fontPrefs[el.key] || {};
-    const size = p.size || el.def;
-    const color = p.color || el.dcolor;
-    return '<div class="fe-row">' +
-      '<div class="fe-label">' + esc(el.label) + '</div>' +
-      '<div class="fe-preview" id="fe-prev-' + el.key + '" style="font-size:' + size + 'px;color:' + color + '">' + esc(el.sample) + '</div>' +
-      '<div class="fe-controls">' +
-        '<button class="fe-step" onclick="bumpFont(\'' + el.key + '\',-1)">A&minus;</button>' +
-        '<span class="fe-size" id="fe-size-' + el.key + '">' + size + 'px</span>' +
-        '<button class="fe-step" onclick="bumpFont(\'' + el.key + '\',1)">A+</button>' +
-        '<input type="color" value="' + color + '" oninput="setFontColor(\'' + el.key + '\', this.value)" title="Line color">' +
-        '<button class="fe-reset" onclick="resetFontEl(\'' + el.key + '\')">reset</button>' +
-      '</div>' +
-    '</div>';
-  }).join('');
+  // Reflect current level highlight, then show the size chooser.
+  let level = 1;
+  const m = (document.body.className.match(/fs-(\d)/) || [])[1];
+  if (m) level = parseInt(m, 10) || 1;
+  for (let i = 1; i <= 6; i++) {
+    const o = document.getElementById('sz-' + i);
+    if (o) o.classList.toggle('active', i === level);
+  }
   document.getElementById('fontEditorOverlay').classList.add('show');
 }
 function closeFontEditor(){
   document.getElementById('fontEditorOverlay').classList.remove('show');
 }
-function bumpFont(key, dir){
-  const cur = (fontPrefs[key] && fontPrefs[key].size) || feDef(key);
-  const next = Math.max(7, Math.min(48, cur + dir));
-  fontPrefs[key] = Object.assign({}, fontPrefs[key], { size: next });
-  applyFontPrefs();
-  const prev = document.getElementById('fe-prev-' + key);
-  const lbl = document.getElementById('fe-size-' + key);
-  if (prev) prev.style.fontSize = next + 'px';
-  if (lbl) lbl.textContent = next + 'px';
-}
-function setFontColor(key, val){
-  fontPrefs[key] = Object.assign({}, fontPrefs[key], { color: val });
-  applyFontPrefs();
-  const prev = document.getElementById('fe-prev-' + key);
-  if (prev) prev.style.color = val;
-}
-function resetFontEl(key){
-  delete fontPrefs[key];
-  applyFontPrefs();
-  openFontEditor();
-}
-function resetAllFontPrefs(){
-  if (!confirm('Reset ALL font sizes and colors back to default?')) return;
-  fontPrefs = {};
-  applyFontPrefs();
-  openFontEditor();
-  showToast('Fonts reset to default');
-}
+// loadFontPrefs kept as a no-op so any existing init() call is harmless.
+function loadFontPrefs(){}
 function loadTheme(){
   // Default to LIGHT (high-contrast black text) — only switch to dark if the user explicitly picked it.
   let stored = null;
