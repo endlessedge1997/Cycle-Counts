@@ -222,6 +222,18 @@ label.field-label{font-family:var(--head);font-size:11px;letter-spacing:1.5px;te
 .bin-row.counted .bin-cta{color:var(--green)}
 .bin-qty-big{font-family:var(--mono);font-size:20px;color:var(--green);font-weight:bold;min-width:54px;text-align:right}
 
+/* ITEM NOTE LINE (one line under each item until clicked) */
+.note-line{display:flex;align-items:center;gap:6px;padding:6px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-family:var(--mono);font-size:10px;-webkit-tap-highlight-color:transparent}
+.note-line:active{filter:brightness(.95)}
+.note-line.has-note{background:#d8f5e3;color:#0a5c30}
+.note-line.no-note{background:#fdf6d0;color:#7a6500}
+body.light .note-line.has-note{background:#d8f5e3;color:#0a5c30}
+body.light .note-line.no-note{background:#fdf6d0;color:#7a6500}
+.note-line .note-ico{flex-shrink:0;font-size:12px;line-height:1}
+.note-line .note-label{flex-shrink:0;font-weight:bold;letter-spacing:.5px}
+.note-line .note-preview{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
+.note-modal-ta{width:100%;min-height:90px;max-height:40vh;resize:vertical;font-family:var(--mono);font-size:13px;line-height:1.4;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)}
+
 /* MODAL OVERLAYS */
 .entry-overlay,.counted-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:flex-end;justify-content:center}
 .entry-overlay.show,.counted-overlay.show{display:flex}
@@ -880,6 +892,21 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
   </div>
 </div>
 
+<!-- ITEM NOTE MODAL -->
+<div class="entry-overlay" id="noteOverlay" onclick="if(event.target===this)closeNoteModal()">
+  <div class="entry-modal" style="border-top-color:var(--green);max-width:440px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+      <div style="font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:1px;color:var(--green)" id="noteTitle">NOTE</div>
+      <button class="modal-close" onclick="closeNoteModal()" title="Close" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:34px;height:34px;font-size:18px;line-height:1;cursor:pointer;color:var(--text)">✕</button>
+    </div>
+    <textarea class="note-modal-ta" id="noteText" placeholder="Type a note for this item…" maxlength="500"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-green" style="margin:0;flex:1" onclick="saveNote()">💾 Save</button>
+      <button class="btn btn-red" style="margin:0;flex:1" onclick="deleteNote()">🗑 Delete</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast">Saved!</div>
 <div id="print-area" style="display:none"></div>
 
@@ -904,11 +931,13 @@ const CSV_COLUMN_ALIASES = {
 let cycleCounts = {};
 let counts = {};
 let history = [];
+let notes = {};            // notes[ccId][itemNum] = "text" — kept separate so Pace re-syncs never wipe them
 let activeCC = '';
 let operator = '';
 let pendingImport = null;
 let npCurrent = '0';
 let entryCtx = null;
+let noteCtx = null;        // { ccId, itemNum } for the open note modal
 let histCcFilter = 'ALL';
 const expandedCards = new Set();
 
@@ -916,6 +945,7 @@ const expandedCards = new Set();
   try { cycleCounts = JSON.parse(localStorage.getItem('pcc_cycleCounts') || '{}'); } catch(e) { cycleCounts = {}; }
   try { counts       = JSON.parse(localStorage.getItem('pcc_counts')       || '{}'); } catch(e) { counts = {}; }
   try { history      = JSON.parse(localStorage.getItem('pcc_history')      || '[]'); } catch(e) { history = []; }
+  try { notes        = JSON.parse(localStorage.getItem('pcc_notes')        || '{}'); } catch(e) { notes = {}; }
   try { activeCC     = localStorage.getItem('pcc_activeCC') || ''; } catch(e) { activeCC = ''; }
   try { operator     = localStorage.getItem('pcc_op') || ''; } catch(e) { operator = ''; }
 
@@ -954,6 +984,7 @@ function persist() {
     localStorage.setItem('pcc_cycleCounts', JSON.stringify(cycleCounts));
     localStorage.setItem('pcc_counts',       JSON.stringify(counts));
     localStorage.setItem('pcc_history',      JSON.stringify(history));
+    localStorage.setItem('pcc_notes',        JSON.stringify(notes));
     localStorage.setItem('pcc_activeCC',     activeCC || '');
     if (operator) localStorage.setItem('pcc_op', operator);
   } catch(e) {}
@@ -1095,6 +1126,19 @@ function renderItems() {
         <span class="ic-chevron">▾</span>
       </div>
       <div class="bin-list">
+      ${(() => {
+        const noteText = getNote(num);
+        const escNumN = esc(num).replace(/'/g,"\\'");
+        if (noteText) {
+          const preview = noteText.replace(/\s+/g, ' ').trim();
+          return `<div class="note-line has-note" onclick="openNoteModal('${escNumN}')">
+            <span class="note-ico">📝</span><span class="note-label">NOTE:</span>
+            <span class="note-preview">${esc(preview)}</span></div>`;
+        }
+        return `<div class="note-line no-note" onclick="openNoteModal('${escNumN}')">
+          <span class="note-ico">➕</span><span class="note-label">NOTE</span>
+          <span class="note-preview">Tap to add a note</span></div>`;
+      })()}
       ${bins.map(b => {
         const cur = ccCounts.find(c => c.itemNum === num && c.bin === b.bin && (c.lot||'') === (b.lot||''));
         const status = cur
@@ -1134,6 +1178,45 @@ function toggleItemCard(num) {
     const card = document.getElementById('card-' + num);
     if (card) card.classList.add('expanded');
   }
+}
+
+// ITEM NOTES ─────────────────────────────────────────
+function getNote(itemNum) {
+  const ccNotes = notes[activeCC];
+  if (!ccNotes) return '';
+  return ccNotes[itemNum] || '';
+}
+function openNoteModal(itemNum) {
+  noteCtx = { ccId: activeCC, itemNum };
+  const cc = cycleCounts[activeCC];
+  const desc = (cc && cc.items[itemNum]) ? cc.items[itemNum].desc : '';
+  document.getElementById('noteTitle').textContent = 'NOTE · #' + itemNum + (desc ? ' — ' + desc : '');
+  document.getElementById('noteText').value = getNote(itemNum);
+  document.getElementById('noteOverlay').classList.add('show');
+  setTimeout(() => { const t = document.getElementById('noteText'); t.focus(); }, 120);
+}
+function closeNoteModal() {
+  document.getElementById('noteOverlay').classList.remove('show');
+  noteCtx = null;
+}
+function saveNote() {
+  if (!noteCtx) { closeNoteModal(); return; }
+  const txt = document.getElementById('noteText').value.trim();
+  if (!notes[noteCtx.ccId]) notes[noteCtx.ccId] = {};
+  if (txt) notes[noteCtx.ccId][noteCtx.itemNum] = txt;
+  else delete notes[noteCtx.ccId][noteCtx.itemNum];
+  persist();
+  closeNoteModal();
+  renderItems();
+  showToast(txt ? 'Note saved' : 'Note cleared');
+}
+function deleteNote() {
+  if (!noteCtx) { closeNoteModal(); return; }
+  if (notes[noteCtx.ccId]) delete notes[noteCtx.ccId][noteCtx.itemNum];
+  persist();
+  closeNoteModal();
+  renderItems();
+  showToast('Note deleted');
 }
 
 // Remove a bin from THIS ITEM only. Other items that share the same bin label keep it.
