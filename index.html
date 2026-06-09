@@ -143,6 +143,25 @@ body.fs-3 .progress-text{font-size:15px}
 body.fs-3 .card-title{font-size:15px}
 body.fs-3 .tab{font-size:16px}
 body.fs-3 .pill{font-size:13px}
+
+/* Larger levels — focus on the Count-screen lines (lot line included) plus nav. */
+body.fs-4 .ic-num{font-size:18px} body.fs-5 .ic-num{font-size:21px} body.fs-6 .ic-num{font-size:24px}
+body.fs-4 .ic-desc{font-size:24px} body.fs-5 .ic-desc{font-size:28px} body.fs-6 .ic-desc{font-size:33px}
+body.fs-4 .bin-loc{font-size:19px} body.fs-5 .bin-loc{font-size:23px} body.fs-6 .bin-loc{font-size:27px}
+body.fs-4 .bin-lot{font-size:18px} body.fs-5 .bin-lot{font-size:22px} body.fs-6 .bin-lot{font-size:26px}
+body.fs-4 .bin-oh,body.fs-4 .bin-status,body.fs-4 .bin-cta{font-size:17px} body.fs-5 .bin-oh,body.fs-5 .bin-status,body.fs-5 .bin-cta{font-size:20px} body.fs-6 .bin-oh,body.fs-6 .bin-status,body.fs-6 .bin-cta{font-size:23px}
+body.fs-4 .bin-qty-big{font-size:32px} body.fs-5 .bin-qty-big{font-size:38px} body.fs-6 .bin-qty-big{font-size:44px}
+body.fs-4 .note-line{font-size:14px} body.fs-5 .note-line{font-size:17px} body.fs-6 .note-line{font-size:20px}
+body.fs-4 .scan-banner input{font-size:28px} body.fs-5 .scan-banner input{font-size:32px} body.fs-6 .scan-banner input{font-size:36px}
+body.fs-4 .em-desc{font-size:30px} body.fs-5 .em-desc{font-size:34px} body.fs-6 .em-desc{font-size:38px}
+body.fs-4 .em-loc,body.fs-4 .em-oh,body.fs-4 .em-item,body.fs-4 .em-prior{font-size:16px} body.fs-5 .em-loc,body.fs-5 .em-oh,body.fs-5 .em-item,body.fs-5 .em-prior{font-size:18px} body.fs-6 .em-loc,body.fs-6 .em-oh,body.fs-6 .em-item,body.fs-6 .em-prior{font-size:20px}
+body.fs-4 .ccc-name{font-size:30px} body.fs-5 .ccc-name{font-size:34px} body.fs-6 .ccc-name{font-size:38px}
+body.fs-4 .tab{font-size:17px} body.fs-5 .tab{font-size:18px} body.fs-6 .tab{font-size:19px}
+
+/* Size chooser buttons */
+.sz-opt{display:block;width:100%;text-align:left;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);padding:14px 16px;margin-bottom:8px;cursor:pointer;font-family:var(--head);font-weight:700;letter-spacing:1px}
+.sz-opt.active{background:var(--accent2);color:#fff;border-color:var(--accent)}
+
 .pill{background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:4px 10px;font-family:var(--mono);font-size:10px;color:var(--text);letter-spacing:1px;cursor:pointer;display:flex;align-items:center;gap:6px}
 .pill .pill-lbl{color:var(--muted);font-size:9px}
 .pill.cc-pill{border-color:var(--accent2);color:var(--accent)}
@@ -238,6 +257,17 @@ body.light .note-line.no-note{background:#fdf6d0;color:#7a6500}
 .note-line .note-label{flex-shrink:0;font-weight:bold;letter-spacing:.5px}
 .note-line .note-preview{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
 .note-modal-ta{width:100%;min-height:90px;max-height:40vh;resize:vertical;font-family:var(--mono);font-size:13px;line-height:1.4;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)}
+
+/* FONT EDITOR */
+.fe-row{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--surface2)}
+.fe-label{font-family:var(--head);font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.fe-preview{background:var(--bg);border:1px dashed var(--border);border-radius:6px;padding:8px 10px;margin-bottom:8px;min-height:24px;word-break:break-word}
+.fe-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fe-controls button.fe-step{background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--head);font-weight:700;font-size:15px;width:38px;height:34px;cursor:pointer}
+.fe-controls button.fe-step:active{background:var(--accent2);color:#fff}
+.fe-controls .fe-size{font-family:var(--mono);font-size:13px;min-width:46px;text-align:center;color:var(--text)}
+.fe-controls input[type=color]{width:42px;height:34px;border:1px solid var(--border);border-radius:6px;background:var(--surface);padding:2px;cursor:pointer}
+.fe-controls button.fe-reset{margin-left:auto;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;padding:7px 10px;cursor:pointer}
 
 /* MODAL OVERLAYS */
 .entry-overlay,.counted-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:flex-end;justify-content:center}
@@ -407,7 +437,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
   </div>
   <div class="h-right">
     <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
-    <button class="theme-btn fs-btn" id="fsBtn" onclick="cycleFontSize()" title="Font size">A</button>
+    <button class="theme-btn fs-btn" id="fsBtn" onclick="openFontEditor()" title="Font &amp; color settings">A</button>
     <div class="pill cc-pill" id="ccPill" onclick="openCcChooser()" title="Switch cycle count">
       <span class="pill-lbl">CC</span>
       <span id="ccPillName">—</span>
@@ -959,12 +989,31 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
   </div>
 </div>
 
+<!-- FONT & COLOR EDITOR MODAL -->
+<div class="entry-overlay" id="fontEditorOverlay" onclick="if(event.target===this)closeFontEditor()">
+  <div class="entry-modal" style="border-top-color:var(--accent);max-width:440px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+      <div style="font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:1px;color:var(--accent)">Text Size</div>
+      <button class="modal-close" onclick="closeFontEditor()" title="Close" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:34px;height:34px;font-size:18px;line-height:1;cursor:pointer;color:var(--text)">✕</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:12px">
+      Pick how big the text is on the Count screen. The setting sticks until you change it — syncing never resets it.
+    </p>
+    <button class="sz-opt" id="sz-1" onclick="setFontSize(1)">Normal</button>
+    <button class="sz-opt" id="sz-2" onclick="setFontSize(2)">Large</button>
+    <button class="sz-opt" id="sz-3" onclick="setFontSize(3)">Larger</button>
+    <button class="sz-opt" id="sz-4" onclick="setFontSize(4)">Extra Large</button>
+    <button class="sz-opt" id="sz-5" onclick="setFontSize(5)">Huge</button>
+    <button class="sz-opt" id="sz-6" onclick="setFontSize(6)">Giant</button>
+  </div>
+</div>
+
 <div id="toast">Saved!</div>
 <div id="print-area" style="display:none"></div>
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-06-09-1027';
+const APP_VERSION = '2026-06-09-1319';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -998,6 +1047,18 @@ let noteCtx = null;        // { ccId, itemNum } for the open note modal
 let addBinCtx = null;      // itemNum for the open Add/Transfer Bin modal
 let histCcFilter = 'ALL';
 const expandedCards = new Set();
+// Per-line font/color editor state — declared here (not lower) so init()'s loadFontPrefs() never hits a TDZ.
+let fontPrefs = {};
+const FONT_ELEMENTS = [
+  { key:'num',    label:'Item number (#)',    sel:'#itemList .ic-num',      def:12, dcolor:'#d4820a', sample:'#10036' },
+  { key:'desc',   label:'Item description',   sel:'#itemList .ic-desc',     def:15, dcolor:'#000000', sample:'Double Wall Cardboard' },
+  { key:'bin',    label:'Bin location',       sel:'#itemList .bin-loc',     def:12, dcolor:'#0072ff', sample:'CAROUSEL CAROUSEL' },
+  { key:'lot',    label:'Lot line',           sel:'#itemList .bin-lot',     def:11, dcolor:'#d4820a', sample:'LOT: 040126-ROLL05' },
+  { key:'oh',     label:'Pace on-hand line',  sel:'#itemList .bin-oh',      def:10, dcolor:'#333333', sample:'Pace On Hand: 167 in' },
+  { key:'status', label:'Count status line',  sel:'#itemList .bin-status',  def:10, dcolor:'#333333', sample:'Not counted yet' },
+  { key:'qty',    label:'Counted qty (big)',  sel:'#itemList .bin-qty-big', def:20, dcolor:'#1a9e5c', sample:'167' },
+  { key:'note',   label:'Note line text',     sel:'#itemList .note-line .note-preview, #itemList .note-line .note-label', def:10, dcolor:'#000000', sample:'NOTE: damaged corner' }
+];
 
 (function init(){
   try { cycleCounts = JSON.parse(localStorage.getItem('pcc_cycleCounts') || '{}'); } catch(e) { cycleCounts = {}; }
@@ -1031,6 +1092,7 @@ const expandedCards = new Set();
 
   loadTheme();
   loadFontSize();
+  loadFontPrefs();
   renderAll();
   updateSyncStatus();
   openCcChooser();
@@ -2668,6 +2730,13 @@ let latestVersion = null;
 async function checkAppVersion() {
   const pill = document.getElementById('verPill');
   const txt = document.getElementById('verPillText');
+  // TEST BUILD: when running as v2.html, never auto-redirect (the version marker reflects
+  // the live index.html, so a mismatch is expected and must NOT bounce us off the test page).
+  if (location.pathname.indexOf('v2.html') >= 0) {
+    if (txt) txt.textContent = 'TEST v2';
+    if (pill) { pill.classList.remove('uptodate','outdated'); }
+    return;
+  }
   if (txt) txt.textContent = APP_VERSION === 'dev' ? 'dev' : APP_VERSION;
   try {
     const res = await fetch(VERSION_URL + '?t=' + Date.now(), { cache: 'no-store' });
@@ -3665,25 +3734,41 @@ function toggleTheme(){
   document.getElementById('themeBtn').textContent = isLight ? '🌙' : '☀️';
   try{ localStorage.setItem('pcc_theme', isLight ? 'light' : 'dark'); }catch(e){}
 }
+// TEXT SIZE (6 levels) ────────────────────────────────
 function setFontSize(level){
-  level = Math.max(1, Math.min(3, parseInt(level,10) || 1));
-  document.body.classList.remove('fs-1','fs-2','fs-3');
+  level = Math.max(1, Math.min(6, parseInt(level,10) || 1));
+  document.body.classList.remove('fs-1','fs-2','fs-3','fs-4','fs-5','fs-6');
   document.body.classList.add('fs-' + level);
   const btn = document.getElementById('fsBtn');
-  if (btn) btn.textContent = level === 1 ? 'A' : level === 2 ? 'A+' : 'A++';
-}
-function cycleFontSize(){
-  const m = (document.body.className.match(/fs-(\d)/) || [])[1];
-  const cur = parseInt(m, 10) || 1;
-  const next = cur >= 3 ? 1 : cur + 1;
-  setFontSize(next);
-  try { localStorage.setItem('pcc_fs', String(next)); } catch(e){}
+  if (btn) btn.textContent = 'A' + (level > 1 ? (level - 1) : '');
+  // Highlight the active option in the size chooser, if open.
+  for (let i = 1; i <= 6; i++) {
+    const o = document.getElementById('sz-' + i);
+    if (o) o.classList.toggle('active', i === level);
+  }
+  try { localStorage.setItem('pcc_fs', String(level)); } catch(e){}
 }
 function loadFontSize(){
   let level = 1;
   try { level = parseInt(localStorage.getItem('pcc_fs') || '1', 10) || 1; } catch(e){}
   setFontSize(level);
 }
+function openFontEditor(){
+  // Reflect current level highlight, then show the size chooser.
+  let level = 1;
+  const m = (document.body.className.match(/fs-(\d)/) || [])[1];
+  if (m) level = parseInt(m, 10) || 1;
+  for (let i = 1; i <= 6; i++) {
+    const o = document.getElementById('sz-' + i);
+    if (o) o.classList.toggle('active', i === level);
+  }
+  document.getElementById('fontEditorOverlay').classList.add('show');
+}
+function closeFontEditor(){
+  document.getElementById('fontEditorOverlay').classList.remove('show');
+}
+// loadFontPrefs kept as a no-op so any existing init() call is harmless.
+function loadFontPrefs(){}
 function loadTheme(){
   // Default to LIGHT (high-contrast black text) — only switch to dark if the user explicitly picked it.
   let stored = null;
