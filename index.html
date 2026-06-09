@@ -318,6 +318,16 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 .card-title{font-family:var(--head);font-weight:700;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
 .divider{font-family:var(--head);font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
 
+/* ACCORDION (collapsible Setup sections) */
+.acc{border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--surface)}
+.acc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;border:none;text-align:left;cursor:pointer;padding:13px 14px;background:var(--surface2);font-family:var(--head);font-weight:700;font-size:14px;letter-spacing:1px;color:var(--text);-webkit-tap-highlight-color:transparent}
+.acc-head:active{filter:brightness(.96)}
+.acc-head .acc-chevron{font-family:var(--mono);font-size:13px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.acc.open .acc-head .acc-chevron{transform:rotate(180deg);color:var(--accent)}
+.acc-body{display:none;padding:14px}
+.acc.open .acc-body{display:block}
+.acc-head .acc-tag{font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;padding:2px 7px;border-radius:100px;flex-shrink:0}
+
 /* CSV DROP ZONE */
 .drop-zone{border:2px dashed var(--border);border-radius:10px;padding:22px 14px;text-align:center;background:var(--surface2);cursor:pointer;transition:all .2s;margin-top:8px;-webkit-tap-highlight-color:transparent;user-select:none}
 .drop-zone:hover{border-color:var(--accent)}
@@ -678,154 +688,167 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 <!-- SETUP TAB -->
 <div class="page" id="page-setup">
 
-  <!-- ═════════════════════════════════════════════════════════════ -->
-  <!--  COUNTER SECTION                                              -->
-  <!-- ═════════════════════════════════════════════════════════════ -->
+  <!-- COUNTER SECTION -->
   <div style="background:linear-gradient(90deg,var(--green) 0%,transparent 100%);padding:6px 12px;border-radius:6px;margin-bottom:8px">
     <div style="font-family:var(--head);font-weight:700;font-size:16px;letter-spacing:2px;color:#000">👤 FOR THE COUNTER (Warehouse)</div>
   </div>
 
-  <div class="card" style="border-color:var(--green)">
-    <div class="card-title" style="color:var(--green)">How to count a cycle count</div>
-    <ol style="margin:0 0 0 18px;padding:0;font-size:13px;line-height:1.7;color:var(--text)">
-      <li>Tap the <strong>CC</strong> pill at top → pick the cycle count you're counting (or use the chooser that pops up when the app opens).</li>
-      <li>Go to <strong>📋 Count</strong> tab. Scan a barcode (or tap a row). The matching item card opens.</li>
-      <li>If the item has one row, the keypad opens automatically. If multiple rows, tap the one you're at.</li>
-      <li>Type the quantity on the keypad, tap <strong>✔ LOG</strong>.</li>
-      <li>Continue until all rows are counted. The header pill shows <strong>X/Y</strong> progress.</li>
-      <li>When done, go to <strong>📤 Export</strong> tab → fill the manager's email → tap <strong>Email Current CSV</strong>. The email opens with the count attached. Send.</li>
-    </ol>
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>📖 How to count a cycle count</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <ol style="margin:0 0 0 18px;padding:0;font-size:13px;line-height:1.7;color:var(--text)">
+        <li>Tap the <strong>CC</strong> pill at top → pick the cycle count you're counting (or use the chooser that pops up when the app opens).</li>
+        <li>Go to <strong>📋 Count</strong> tab. Scan a barcode (or tap a row). The matching item card opens.</li>
+        <li>If the item has one row, the keypad opens automatically. If multiple rows, tap the one you're at.</li>
+        <li>Type the quantity on the keypad, tap <strong>✔ LOG</strong>.</li>
+        <li>Continue until all rows are counted. The header pill shows <strong>X/Y</strong> progress.</li>
+        <li>When done, go to <strong>📤 Export</strong> tab → fill the manager's email → tap <strong>Email Current CSV</strong>. Send.</li>
+      </ol>
+    </div>
   </div>
 
-  <div class="card" style="border-color:var(--green)">
-    <div class="card-title" style="color:var(--green)">Active cycle count</div>
-    <select id="ccSelect" onchange="switchActiveCC(this.value)" style="margin-bottom:8px"></select>
-    <p style="font-size:11px;color:var(--muted);line-height:1.5">
-      Pick which cycle count the Count tab is showing. Your counts are saved separately per CC.
-    </p>
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>📋 Active cycle count</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <select id="ccSelect" onchange="switchActiveCC(this.value)" style="margin-bottom:8px"></select>
+      <p style="font-size:11px;color:var(--muted);line-height:1.5">Pick which cycle count the Count tab is showing. Your counts are saved separately per CC.</p>
+    </div>
   </div>
 
-  <div class="card" style="border-color:var(--green)">
-    <div class="card-title" style="color:var(--green)">🔄 Pull latest data from Pace</div>
-    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">
-      The app auto-syncs when it opens. Tap below to force a refresh anytime — for example if the manager just pushed new Pace data. Your in-progress counts and history are kept.
-    </p>
-    <div id="syncStatus" style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:10px;letter-spacing:.5px;word-break:break-word">Not synced yet</div>
-    <button class="btn btn-green" onclick="syncNow()" style="margin:0">⬇ Sync Now</button>
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>🔄 Pull latest data from Pace</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">The app auto-syncs when it opens. Tap below to force a refresh anytime. Your in-progress counts and history are kept.</p>
+      <div id="syncStatus" style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:10px;letter-spacing:.5px;word-break:break-word">Not synced yet</div>
+      <button class="btn btn-green" onclick="syncNow()" style="margin:0">⬇ Sync Now</button>
+    </div>
   </div>
 
-  <!-- ═════════════════════════════════════════════════════════════ -->
-  <!--  MANAGER SECTION                                              -->
-  <!-- ═════════════════════════════════════════════════════════════ -->
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>🗂 Hide unused bin locations</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">
+        Uncheck any bin location you don't want to see while counting (e.g. <strong>DEFAULT</strong> or old spots). Hidden locations stay hidden through every Pace sync. Re-check to bring one back.
+      </p>
+      <input type="text" id="binFilterSearch" placeholder="Search bin locations…" autocomplete="off" oninput="renderBinFilter()" style="margin-bottom:8px">
+      <div id="binFilterMeta" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:.5px">—</div>
+      <div id="binFilterList" style="max-height:46vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:0 8px"></div>
+      <button class="btn btn-ghost" onclick="showAllBins()" style="margin-top:10px;padding:8px 12px;font-size:11px">↺ Show all locations (clear filter)</button>
+    </div>
+  </div>
+
+  <!-- MANAGER SECTION -->
   <div style="background:linear-gradient(90deg,var(--accent2) 0%,transparent 100%);padding:6px 12px;border-radius:6px;margin:24px 0 8px">
     <div style="font-family:var(--head);font-weight:700;font-size:16px;letter-spacing:2px;color:#fff">👔 FOR THE MANAGER</div>
   </div>
 
-  <div class="card" style="border-color:var(--accent)">
-    <div class="card-title" style="color:var(--accent)">A. Push fresh Pace data to all warehouse phones</div>
-    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
-      Run this any time Pace inventory changes. Two steps: scrape Pace → upload to the gist. All warehouse phones see the new data on next open (or via Sync Now).
-    </p>
-    <div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px;margin-bottom:10px;font-size:12px;line-height:1.6">
-      <strong style="color:var(--accent)">STEP 1 — Scrape Pace on a computer:</strong>
-      <ol style="margin:6px 0 8px 18px;padding:0">
-        <li>Open <strong>any Pace page</strong>, logged in.</li>
-        <li>Press <strong>F12</strong>, click <strong>Console</strong>.</li>
-        <li>Tap the button below to copy the script.</li>
-        <li>Paste in the Pace console, press <strong>Enter</strong>.</li>
-        <li>A combined CSV (all 5 CCs) downloads to your computer.</li>
-      </ol>
-      <button class="btn btn-primary" onclick="copyF12AllScript()" style="margin:0">📋 Copy ALL-CCs F12 Script</button>
-    </div>
-    <div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px;font-size:12px;line-height:1.6">
-      <strong style="color:var(--accent)">STEP 2 — Upload that CSV to the gist:</strong>
-      <ol style="margin:6px 0 8px 18px;padding:0">
-        <li>Tap the button below.</li>
-        <li>Pick the CSV you just downloaded (likely in your Downloads folder).</li>
-        <li>First time only: a prompt asks for your GitHub Personal Access Token. Paste it. Saved here only.</li>
-        <li>Wait for "✓ Uploaded + synced…" status.</li>
-      </ol>
-      <input type="file" id="gistUploadFile" accept=".csv,text/csv,text/plain" style="display:none" onchange="uploadCsvToGist(event)">
-      <button class="btn btn-primary" onclick="document.getElementById('gistUploadFile').click()" style="margin:0">📤 Upload CSV to Gist</button>
-      <button class="btn btn-ghost" onclick="clearStoredPat()" style="margin-top:6px;padding:6px 10px;font-size:10px">🗑 Clear saved PAT (if rotating token)</button>
-    </div>
-  </div>
-
-  <div class="card" style="border-color:var(--accent)">
-    <div class="card-title" style="color:var(--accent)">B. Apply counter's results back to Pace</div>
-    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
-      After the counter emails you their Email Current CSV, push the values into the matching Pace cycle count.
-    </p>
-    <div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px;font-size:12px;line-height:1.6">
-      <ol style="margin:0 0 8px 18px;padding:0">
-        <li>Open Pace in a desktop browser. Navigate to the <strong>same CC's detail page</strong> as the counter's CSV (e.g. CC 5085).</li>
-        <li>Press <strong>F12</strong>, click <strong>Console</strong>.</li>
-        <li>Tap the button below to copy the Fill script.</li>
-        <li>Paste in the Pace console, press <strong>Enter</strong>. A white overlay dialog appears.</li>
-        <li>Open the counter's email → select the CSV block (from <code>"Cycle Count","Item Number",…</code> through the last row) → copy.</li>
-        <li>Paste into the dialog's text area, click <strong>Fill Counts</strong>.</li>
-        <li>Review the filled values in Pace. Click <strong>Save</strong>.</li>
-      </ol>
-      <button class="btn btn-primary" onclick="copyF12FillScript()" style="margin:0">📋 Copy Pace Fill Script</button>
-    </div>
-  </div>
-
-  <!-- ═════════════════════════════════════════════════════════════ -->
-  <!--  ADVANCED / RARELY USED                                       -->
-  <!-- ═════════════════════════════════════════════════════════════ -->
-  <div style="background:linear-gradient(90deg,var(--muted) 0%,transparent 100%);padding:6px 12px;border-radius:6px;margin:24px 0 8px">
-    <div style="font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:2px;color:#fff">⚙ ADVANCED / RARELY USED</div>
-  </div>
-
-  <div class="card" style="border-color:var(--gold)">
-    <div class="card-title" style="color:var(--gold)">Manual CSV import (skip gist)</div>
-    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
-      For one-off imports without going through the gist sync. Drop a CSV here to refresh one or all CCs. Auto-detects whether it's a single-CC or combined CSV.
-    </p>
-    <label class="field-label">Cycle Count ID (only used when CSV has no Cycle Count column)</label>
-    <input type="text" id="newCcId" placeholder="5085" style="margin-bottom:10px">
-    <input type="file" id="csvFileInput" accept=".csv,text/csv,text/plain" style="display:none" onchange="handleCsvFile(event)">
-    <div id="csvDropZone" class="drop-zone"
-         ondragover="onDropZoneOver(event)"
-         ondragenter="onDropZoneOver(event)"
-         ondragleave="onDropZoneLeave(event)"
-         ondrop="onDropZoneDrop(event)"
-         onclick="document.getElementById('csvFileInput').click()">
-      <div class="drop-zone-icon">📥</div>
-      <div class="drop-zone-text">Drop CSV here</div>
-      <div class="drop-zone-hint">or tap to browse</div>
-    </div>
-    <div class="import-preview" id="importPreview">
-      <div style="font-family:var(--head);font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px" id="importTitle">Preview</div>
-      <pre id="importBody"></pre>
-      <div class="import-actions">
-        <button class="btn btn-green" onclick="commitImport()">Save Cycle Count</button>
-        <button class="btn btn-red" onclick="cancelImport()">Cancel</button>
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>⬆ A. Push fresh Pace data to phones</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">Run this any time Pace inventory changes. Two steps: scrape Pace → upload to the gist. All warehouse phones see the new data on next open (or via Sync Now).</p>
+      <div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px;margin-bottom:10px;font-size:12px;line-height:1.6">
+        <strong style="color:var(--accent)">STEP 1 — Scrape Pace on a computer:</strong>
+        <ol style="margin:6px 0 8px 18px;padding:0">
+          <li>Open <strong>any Pace page</strong>, logged in.</li>
+          <li>Press <strong>F12</strong>, click <strong>Console</strong>.</li>
+          <li>Tap the button below to copy the script.</li>
+          <li>Paste in the Pace console, press <strong>Enter</strong>.</li>
+          <li>A combined CSV (all 5 CCs) downloads to your computer.</li>
+        </ol>
+        <button class="btn btn-primary" onclick="copyF12AllScript()" style="margin:0">📋 Copy ALL-CCs F12 Script</button>
+      </div>
+      <div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px;font-size:12px;line-height:1.6">
+        <strong style="color:var(--accent)">STEP 2 — Upload that CSV to the gist:</strong>
+        <ol style="margin:6px 0 8px 18px;padding:0">
+          <li>Tap the button below.</li>
+          <li>Pick the CSV you just downloaded (likely in your Downloads folder).</li>
+          <li>First time only: a prompt asks for your GitHub Personal Access Token. Paste it. Saved here only.</li>
+          <li>Wait for "✓ Uploaded + synced…" status.</li>
+        </ol>
+        <input type="file" id="gistUploadFile" accept=".csv,text/csv,text/plain" style="display:none" onchange="uploadCsvToGist(event)">
+        <button class="btn btn-primary" onclick="document.getElementById('gistUploadFile').click()" style="margin:0">📤 Upload CSV to Gist</button>
+        <button class="btn btn-ghost" onclick="clearStoredPat()" style="margin-top:6px;padding:6px 10px;font-size:10px">🗑 Clear saved PAT (if rotating token)</button>
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">Other F12 scripts</div>
-    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">Backup tools — rarely needed.</p>
-    <button class="btn btn-ghost" onclick="copyF12Script()" style="margin-top:0;padding:8px 12px;font-size:11px">📋 Single-CC F12 Script (refresh one CC only)</button>
-    <button class="btn btn-ghost" onclick="copyF12SyncScript()" style="margin-top:6px;padding:8px 12px;font-size:11px">📋 One-step SYNC script (may fail if Pace blocks api.github.com)</button>
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>⬇ B. Apply counter's results to Pace</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">After the counter emails you their Email Current CSV, push the values into the matching Pace cycle count.</p>
+      <div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px;font-size:12px;line-height:1.6">
+        <ol style="margin:0 0 8px 18px;padding:0">
+          <li>Open Pace in a desktop browser. Navigate to the <strong>same CC's detail page</strong> as the counter's CSV (e.g. CC 5085).</li>
+          <li>Press <strong>F12</strong>, click <strong>Console</strong>.</li>
+          <li>Tap the button below to copy the Fill script.</li>
+          <li>Paste in the Pace console, press <strong>Enter</strong>. A white overlay dialog appears.</li>
+          <li>Open the counter's email → select the CSV block (from <code>"Cycle Count","Item Number",…</code> through the last row) → copy.</li>
+          <li>Paste into the dialog's text area, click <strong>Fill Counts</strong>.</li>
+          <li>Review the filled values in Pace. Click <strong>Save</strong>.</li>
+        </ol>
+        <button class="btn btn-primary" onclick="copyF12FillScript()" style="margin:0">📋 Copy Pace Fill Script</button>
+      </div>
+    </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">Manage cycle counts</div>
-    <div id="ccMgmtList" style="font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.8"></div>
+  <!-- ADVANCED -->
+  <div style="background:linear-gradient(90deg,var(--muted) 0%,transparent 100%);padding:6px 12px;border-radius:6px;margin:24px 0 8px">
+    <div style="font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:2px;color:#fff">⚙ ADVANCED / RARELY USED</div>
   </div>
 
-  <div class="divider">Reset</div>
-  <button class="btn btn-red" onclick="resetActiveCounts()">⚠ Clear Counts for Active Cycle Count</button>
-  <p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">
-    Removes counts from the current cycle count only. History entries remain. Items master is untouched.
-  </p>
-  <button class="btn btn-red" style="margin-top:10px" onclick="clearAllHistory()">⚠ Clear All History</button>
-  <p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">
-    Wipes the History tab. Does not affect the current cycle count's counts.
-  </p>
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>📥 Manual CSV import (skip gist)</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">For one-off imports without going through the gist sync. Auto-detects single-CC or combined CSV.</p>
+      <label class="field-label">Cycle Count ID (only used when CSV has no Cycle Count column)</label>
+      <input type="text" id="newCcId" placeholder="5085" style="margin-bottom:10px">
+      <input type="file" id="csvFileInput" accept=".csv,text/csv,text/plain" style="display:none" onchange="handleCsvFile(event)">
+      <div id="csvDropZone" class="drop-zone"
+           ondragover="onDropZoneOver(event)"
+           ondragenter="onDropZoneOver(event)"
+           ondragleave="onDropZoneLeave(event)"
+           ondrop="onDropZoneDrop(event)"
+           onclick="document.getElementById('csvFileInput').click()">
+        <div class="drop-zone-icon">📥</div>
+        <div class="drop-zone-text">Drop CSV here</div>
+        <div class="drop-zone-hint">or tap to browse</div>
+      </div>
+      <div class="import-preview" id="importPreview">
+        <div style="font-family:var(--head);font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px" id="importTitle">Preview</div>
+        <pre id="importBody"></pre>
+        <div class="import-actions">
+          <button class="btn btn-green" onclick="commitImport()">Save Cycle Count</button>
+          <button class="btn btn-red" onclick="cancelImport()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>🧰 Other F12 scripts</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">Backup tools — rarely needed.</p>
+      <button class="btn btn-ghost" onclick="copyF12Script()" style="margin-top:0;padding:8px 12px;font-size:11px">📋 Single-CC F12 Script (refresh one CC only)</button>
+      <button class="btn btn-ghost" onclick="copyF12SyncScript()" style="margin-top:6px;padding:8px 12px;font-size:11px">📋 One-step SYNC script (may fail if Pace blocks api.github.com)</button>
+    </div>
+  </div>
+
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>🗃 Manage cycle counts</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <div id="ccMgmtList" style="font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.8"></div>
+    </div>
+  </div>
+
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>⚠ Reset / clear data</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <button class="btn btn-red" onclick="resetActiveCounts()">⚠ Clear Counts for Active Cycle Count</button>
+      <p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">Removes counts from the current cycle count only. History entries remain. Items master is untouched.</p>
+      <button class="btn btn-red" style="margin-top:10px" onclick="clearAllHistory()">⚠ Clear All History</button>
+      <p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">Wipes the History tab. Does not affect the current cycle count's counts.</p>
+    </div>
+  </div>
 </div>
 
 <!-- COUNT ENTRY MODAL -->
@@ -917,7 +940,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-06-09-0737';
+const APP_VERSION = '2026-06-09-0747';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -939,6 +962,7 @@ let cycleCounts = {};
 let counts = {};
 let history = [];
 let notes = {};            // notes[ccId][itemNum] = "text" — kept separate so Pace re-syncs never wipe them
+let hiddenBins = new Set();// bin labels filtered out of the count view — persists across Pace syncs
 let activeCC = '';
 let operator = '';
 let pendingImport = null;
@@ -953,6 +977,7 @@ const expandedCards = new Set();
   try { counts       = JSON.parse(localStorage.getItem('pcc_counts')       || '{}'); } catch(e) { counts = {}; }
   try { history      = JSON.parse(localStorage.getItem('pcc_history')      || '[]'); } catch(e) { history = []; }
   try { notes        = JSON.parse(localStorage.getItem('pcc_notes')        || '{}'); } catch(e) { notes = {}; }
+  try { hiddenBins   = new Set(JSON.parse(localStorage.getItem('pcc_hiddenBins') || '[]')); } catch(e) { hiddenBins = new Set(); }
   try { activeCC     = localStorage.getItem('pcc_activeCC') || ''; } catch(e) { activeCC = ''; }
   try { operator     = localStorage.getItem('pcc_op') || ''; } catch(e) { operator = ''; }
 
@@ -994,6 +1019,7 @@ function persist() {
     localStorage.setItem('pcc_counts',       JSON.stringify(counts));
     localStorage.setItem('pcc_history',      JSON.stringify(history));
     localStorage.setItem('pcc_notes',        JSON.stringify(notes));
+    localStorage.setItem('pcc_hiddenBins',   JSON.stringify(Array.from(hiddenBins)));
     localStorage.setItem('pcc_activeCC',     activeCC || '');
     if (operator) localStorage.setItem('pcc_op', operator);
   } catch(e) {}
@@ -1048,10 +1074,10 @@ function renderCcChooser() {
   }
   list.innerHTML = ids.map(id => {
     const cc = cycleCounts[id];
-    const itemN = Object.keys(cc.items || {}).length;
     let binN = 0;
-    Object.values(cc.items || {}).forEach(it => binN += (it.bins || []).length);
-    const countedN = (counts[id] || []).length;
+    Object.values(cc.items || {}).forEach(it => binN += visibleBins(it).length);
+    const itemN = Object.values(cc.items || {}).filter(it => visibleBins(it).length).length;
+    const countedN = (counts[id] || []).filter(c => !isBinHidden(c.bin)).length;
     const pct = binN ? Math.round(countedN / binN * 100) : 0;
     const finalized = cc.finalizedAt ? '<span class="ccc-final">✔ FINALIZED</span>' : '';
     const progStr = countedN ? `<span class="ccc-prog">${countedN}/${binN} counted (${pct}%)</span>` : `${binN} rows · not started`;
@@ -1064,12 +1090,20 @@ function renderCcChooser() {
   }).join('');
 }
 
+// BIN FILTER ─────────────────────────────────────────
+// hiddenBins holds bin labels (the combined "Location Bin" string) the user filtered out.
+// Applied at display/count time only — the underlying data keeps every bin, so unhiding
+// brings them straight back with no re-sync.
+function isBinHidden(label) { return hiddenBins.has(label); }
+function visibleBins(item) { return (item && item.bins ? item.bins : []).filter(b => !isBinHidden(b.bin)); }
+
 function activeCCTotals() {
   const cc = cycleCounts[activeCC];
   if (!cc) return { counted: 0, total: 0 };
   let total = 0;
-  Object.values(cc.items || {}).forEach(it => total += (it.bins || []).length);
-  const counted = (counts[activeCC] || []).length;
+  Object.values(cc.items || {}).forEach(it => total += visibleBins(it).length);
+  const ccCounts = counts[activeCC] || [];
+  const counted = ccCounts.filter(c => !isBinHidden(c.bin)).length;
   return { counted, total };
 }
 
@@ -1085,7 +1119,13 @@ function switchTab(t) {
   if (t === 'export') renderExportSummary();
   if (t === 'labels') renderLabelsTab();
   if (t === 'calc') initCalcTab();
-  if (t === 'setup') { renderCcSelect(); renderCcMgmtList(); updateSyncStatus(); }
+  if (t === 'setup') { renderCcSelect(); renderCcMgmtList(); updateSyncStatus(); renderBinFilter(); }
+}
+
+// Collapsible Setup sections (accordion).
+function toggleAcc(headEl) {
+  const acc = headEl.closest('.acc');
+  if (acc) acc.classList.toggle('open');
 }
 
 // ITEM LIST (Count tab) ────────────────────────────────────────
@@ -1114,11 +1154,12 @@ function renderItems() {
   });
   wrap.innerHTML = itemNums.map(num => {
     const item = cc.items[num];
-    const bins = (item.bins || []).slice().sort((a,b) => {
+    const bins = visibleBins(item).slice().sort((a,b) => {
       const c = a.bin.localeCompare(b.bin);
       if (c !== 0) return c;
       return (a.lot || '').localeCompare(b.lot || '');
     });
+    if (!bins.length) return '';  // every bin for this item is filtered out — hide the item
     const countedBins = bins.filter(b => ccCounts.find(c => c.itemNum === num && c.bin === b.bin && (c.lot||'') === (b.lot||'')));
     const allDone = countedBins.length === bins.length;
     const partial = countedBins.length > 0 && !allDone;
@@ -1785,6 +1826,63 @@ function renderCcMgmtList() {
     </div>`;
   }).join('');
 }
+// BIN FILTER UI ───────────────────────────────────────
+// Distinct bin labels across ALL loaded CCs, each with the # of items that use it.
+function allBinLabels() {
+  const map = {};
+  Object.values(cycleCounts).forEach(cc => {
+    Object.values(cc.items || {}).forEach(it => {
+      const seen = new Set();
+      (it.bins || []).forEach(b => {
+        if (seen.has(b.bin)) return; // count each item once per label
+        seen.add(b.bin);
+        map[b.bin] = (map[b.bin] || 0) + 1;
+      });
+    });
+  });
+  return map;
+}
+function renderBinFilter() {
+  const wrap = document.getElementById('binFilterList');
+  if (!wrap) return;
+  const q = (document.getElementById('binFilterSearch')?.value || '').trim().toLowerCase();
+  const map = allBinLabels();
+  let labels = Object.keys(map).sort((a,b) => a.localeCompare(b));
+  if (q) labels = labels.filter(l => l.toLowerCase().includes(q));
+  const hiddenCount = hiddenBins.size;
+  const meta = document.getElementById('binFilterMeta');
+  if (meta) meta.textContent = labels.length + ' location' + (labels.length===1?'':'s') +
+    (hiddenCount ? ' · ' + hiddenCount + ' hidden' : '') + (q ? ' · filtered' : '');
+  if (!labels.length) {
+    wrap.innerHTML = '<div style="color:var(--muted);padding:8px 0;font-size:11px">No bin locations' + (q ? ' match "' + esc(q) + '"' : ' loaded yet') + '.</div>';
+    return;
+  }
+  wrap.innerHTML = labels.map(label => {
+    const hidden = isBinHidden(label);
+    const escL = esc(label).replace(/'/g,"\\'");
+    return `<label style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border);cursor:pointer">
+      <input type="checkbox" ${hidden ? '' : 'checked'} onchange="toggleBinHidden('${escL}', !this.checked)" style="width:18px;height:18px;flex-shrink:0">
+      <span style="flex:1;min-width:0;font-family:var(--mono);font-size:12px;${hidden ? 'text-decoration:line-through;opacity:.55' : ''}">${esc(label)}</span>
+      <span style="font-size:10px;color:var(--muted);flex-shrink:0">${map[label]} item${map[label]===1?'':'s'}</span>
+    </label>`;
+  }).join('');
+}
+function toggleBinHidden(label, hide) {
+  if (hide) hiddenBins.add(label); else hiddenBins.delete(label);
+  persist();
+  renderBinFilter();
+  renderItems();
+  renderHeader();
+}
+function showAllBins() {
+  hiddenBins.clear();
+  persist();
+  renderBinFilter();
+  renderItems();
+  renderHeader();
+  showToast('All bin locations shown');
+}
+
 function deleteCC(id) {
   if (!confirm('Delete cycle count ' + id + '?\n\nIts items and current counts are removed. History entries tagged with this CC stay.\n\nIf this CC is in the pre-loaded list, it will be restored on next refresh from the embedded seed data.')) return;
   delete cycleCounts[id];
@@ -2840,7 +2938,7 @@ function printCurrent() {
   if (!itemNums.length) { showToast('No items to print','err'); return; }
   const rows = itemNums.map(num => {
     const item = cc.items[num];
-    const bins = (item.bins || []).slice().sort((a,b) => {
+    const bins = visibleBins(item).slice().sort((a,b) => {
       const c = a.bin.localeCompare(b.bin);
       if (c !== 0) return c;
       return (a.lot || '').localeCompare(b.lot || '');
@@ -3025,11 +3123,12 @@ function renderLabelsTab() {
   });
   list.innerHTML = itemNums.map(num => {
     const item = cc.items[num];
-    const bins = (item.bins || []).slice().sort((a,b) => {
+    const bins = visibleBins(item).slice().sort((a,b) => {
       const c = a.bin.localeCompare(b.bin);
       if (c !== 0) return c;
       return (a.lot || '').localeCompare(b.lot || '');
     });
+    if (!bins.length) return '';
     const allChecked = bins.length > 0 && bins.every(b => labelSelections.has(labelKey(num, b.bin, b.lot||'')));
     const escNum = esc(num).replace(/'/g,"\\'");
     return `<div class="lbl-item">
@@ -3108,7 +3207,7 @@ function printLabels() {
   });
   for (const num of itemNums) {
     const item = cc.items[num];
-    const bins = (item.bins || []).slice().sort((a,b) => {
+    const bins = visibleBins(item).slice().sort((a,b) => {
       const c = a.bin.localeCompare(b.bin);
       if (c !== 0) return c;
       return (a.lot || '').localeCompare(b.lot || '');
