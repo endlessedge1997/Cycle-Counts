@@ -151,6 +151,11 @@ body.fs-3 .pill{font-size:13px}
 .pill.sync-pill.fresh{background:var(--green);color:#000;border-color:var(--green)}
 .pill.sync-pill.stale{background:var(--gold);color:#000;border-color:var(--gold)}
 .pill.sync-pill.bad{background:var(--red);color:#fff;border-color:var(--red)}
+.pill.ver-pill{background:var(--surface2);color:var(--text);border-color:var(--border)}
+.pill.ver-pill.uptodate{background:var(--green);color:#000;border-color:var(--green)}
+.pill.ver-pill.outdated{background:var(--red);color:#fff;border-color:var(--red)}
+.pill.ver-pill.outdated{animation:verPulse 1.2s ease-in-out infinite}
+@keyframes verPulse{0%,100%{opacity:1}50%{opacity:.55}}
 
 /* TABS */
 .tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -397,16 +402,16 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
       <span class="pill-lbl">CC</span>
       <span id="ccPillName">—</span>
     </div>
-    <div class="pill" id="opPill" style="cursor:default">
-      <span class="pill-lbl">👤</span>
-      <span id="opPillName">—</span>
-    </div>
     <div class="pill count-pill" title="Tap to view & export counted items" onclick="openCountedList()" style="cursor:pointer">
       <span id="counterText">0/0</span>
     </div>
     <div class="pill sync-pill" id="syncPill" onclick="syncNow()" title="Tap to pull latest Pace data" style="cursor:pointer">
       <span class="pill-lbl">SYNC</span>
       <span id="syncPillTime">—</span>
+    </div>
+    <div class="pill ver-pill" id="verPill" onclick="onVerPillClick()" title="App version" style="cursor:pointer">
+      <span class="pill-lbl">APP</span>
+      <span id="verPillText">…</span>
     </div>
   </div>
 </header>
@@ -911,6 +916,8 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 <div id="print-area" style="display:none"></div>
 
 <script>
+// APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
+const APP_VERSION = '2026-06-09-0737';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -975,6 +982,8 @@ const expandedCards = new Set();
   openCcChooser();
   // Background sync from the Pace gist — non-blocking, updates the chooser when fresh data lands.
   setTimeout(() => { syncFromGist(true); }, 200);
+  // Check whether a newer app version is live (and auto-update once if so).
+  setTimeout(() => { checkAppVersion(); }, 400);
   // Refresh the "X min ago" display every minute so it stays accurate without a reload.
   setInterval(updateSyncStatus, 60000);
 })();
@@ -1005,7 +1014,6 @@ function renderHeader() {
   const cc = cycleCounts[activeCC];
   const label = cc ? (cc.id + (cc.name ? ' · ' + cc.name : '')) : '— pick a CC —';
   document.getElementById('ccPillName').textContent = label;
-  document.getElementById('opPillName').textContent = operator || '—';
   const totals = activeCCTotals();
   document.getElementById('counterText').textContent = totals.counted + '/' + totals.total;
 }
@@ -2424,6 +2432,71 @@ function commitImport() {
 
 // LIVE SYNC FROM GIST ─────────────────────────────────────────
 const PACE_DATA_URL = 'https://gist.githubusercontent.com/endlessedge1997/dd6dd78a9c1644f0d5dd2ccd376bf366/raw/cycle_count.csv';
+
+// APP VERSION CHECK ──────────────────────────────────
+// _deploy.ps1 stamps APP_VERSION into the HTML AND writes the same value to version.txt
+// in the repo. On launch we fetch version.txt (cache-busted) and compare. If the live
+// version is newer than the one baked into the running page, this copy is stale.
+const VERSION_URL = 'https://endlessedge1997.github.io/Cycle-Counts/version.txt';
+let latestVersion = null;
+
+async function checkAppVersion() {
+  const pill = document.getElementById('verPill');
+  const txt = document.getElementById('verPillText');
+  if (txt) txt.textContent = APP_VERSION === 'dev' ? 'dev' : APP_VERSION;
+  try {
+    const res = await fetch(VERSION_URL + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    latestVersion = (await res.text()).trim();
+    if (!latestVersion) throw new Error('empty version');
+    if (pill) pill.classList.remove('uptodate','outdated');
+    if (APP_VERSION === 'dev') {
+      // Running a local/unstamped copy — don't nag.
+      if (txt) txt.textContent = 'dev';
+      return;
+    }
+    if (latestVersion === APP_VERSION) {
+      if (pill) pill.classList.add('uptodate');
+      if (txt) txt.textContent = 'Up to date';
+    } else {
+      if (pill) pill.classList.add('outdated');
+      if (txt) txt.textContent = 'Update ↻';
+      // Auto-update once per session to avoid surprising a counter mid-shift with repeated reloads.
+      let alreadyTried = false;
+      try { alreadyTried = sessionStorage.getItem('pcc_autoUpdated') === latestVersion; } catch(e) {}
+      if (!alreadyTried) {
+        try { sessionStorage.setItem('pcc_autoUpdated', latestVersion); } catch(e) {}
+        forceUpdate();
+      }
+    }
+  } catch (err) {
+    // Offline or version.txt missing — just show the running version, no nag.
+    if (txt) txt.textContent = APP_VERSION === 'dev' ? 'dev' : 'v' + APP_VERSION;
+  }
+}
+
+function forceUpdate() {
+  // Navigate to the live URL with a cache-busting query string. iOS home-screen WebKit
+  // serves cached HTML on a plain reload, but a NEW url (?v=...) forces a fresh fetch.
+  const base = 'https://endlessedge1997.github.io/Cycle-Counts/';
+  const target = base + '?v=' + (latestVersion || Date.now());
+  location.replace(target);
+}
+
+function onVerPillClick() {
+  if (APP_VERSION === 'dev') { showToast('Running a local copy (dev)'); return; }
+  if (latestVersion && latestVersion !== APP_VERSION) {
+    showToast('Updating to ' + latestVersion + '…');
+    setTimeout(forceUpdate, 400);
+  } else {
+    // Manual re-check + force refresh anyway.
+    showToast('Checking for updates…');
+    checkAppVersion().then(() => {
+      if (latestVersion && latestVersion !== APP_VERSION) { setTimeout(forceUpdate, 400); }
+      else showToast('Already on the latest version');
+    });
+  }
+}
 
 function updateSyncStatus(msg) {
   const el = document.getElementById('syncStatus');
