@@ -493,29 +493,25 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <!-- EXPORT TAB -->
 <div class="page" id="page-export">
-  <div class="card">
-    <div class="card-title">Current Cycle Count</div>
+  <div class="card" style="border-color:var(--accent)">
+    <div class="card-title" style="color:var(--accent)">Send Current Counts to Manager</div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.7;margin-bottom:10px" id="exportSummary">—</div>
-    <button class="btn btn-green" onclick="printCurrent()">🖨 Print Current Counts</button>
-    <button class="btn btn-ghost" onclick="downloadCSV('current')">⬇ Download Current as CSV</button>
-    <button class="btn btn-ghost" onclick="copyCSV('current')">📋 Copy Current to Clipboard</button>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Email Current Counts</div>
-    <label class="field-label">Your Email</label>
-    <input type="email" id="emailAddr" placeholder="you@endlessedge.com" style="margin-bottom:10px">
-    <button class="btn btn-primary" onclick="emailReport('current')">✉ Email Current CSV</button>
+    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
+      Tap <strong style="color:var(--text)">Copy Current CSV</strong>, then open your email app, start a message to the manager, and <strong style="color:var(--text)">paste</strong> into the body. Send it. (This text is what the manager pastes into Pace — don't send a file attachment.)
+    </p>
+    <button class="btn btn-primary" onclick="copyCSV('current')">📋 Copy Current CSV (then paste into email)</button>
+    <button class="btn btn-green" style="margin-top:8px" onclick="printCurrent()">🖨 Print Current Counts</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="downloadCSV('current')">⬇ Download as CSV file (backup)</button>
   </div>
 
   <div class="card">
     <div class="card-title">History</div>
     <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
-      Print or export <strong style="color:var(--text)">all historical counts</strong> — applies current search/filter from the History tab.
+      All historical counts — applies the current search/filter from the History tab.
     </p>
-    <button class="btn btn-green" onclick="printHistory()">🖨 Print History</button>
-    <button class="btn btn-ghost" onclick="downloadCSV('history')">⬇ Download History as CSV</button>
-    <button class="btn btn-primary" onclick="emailReport('history')">✉ Email History CSV</button>
+    <button class="btn btn-primary" onclick="copyCSV('history')">📋 Copy History CSV</button>
+    <button class="btn btn-green" style="margin-top:8px" onclick="printHistory()">🖨 Print History</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="downloadCSV('history')">⬇ Download History as CSV file</button>
   </div>
 
   <div class="card" style="border-color:var(--gold)">
@@ -732,7 +728,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
         <li>If the item has one row, the keypad opens automatically. If multiple rows, tap the one you're at.</li>
         <li>Type the quantity on the keypad, tap <strong>✔ LOG</strong>.</li>
         <li>Continue until all rows are counted. The header pill shows <strong>X/Y</strong> progress.</li>
-        <li>When done, go to <strong>📤 Export</strong> tab → fill the manager's email → tap <strong>Email Current CSV</strong>. Send.</li>
+        <li>When done, go to <strong>📤 Export</strong> tab → tap <strong>Copy Current CSV</strong> → open your email app, paste it into a message to the manager, and send.</li>
       </ol>
     </div>
   </div>
@@ -809,7 +805,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
   <div class="acc">
     <button class="acc-head" onclick="toggleAcc(this)"><span>⬇ B. Apply counter's results to Pace</span><span class="acc-chevron">▾</span></button>
     <div class="acc-body">
-      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">After the counter emails you their Email Current CSV, push the values into the matching Pace cycle count.</p>
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">After the counter copies their counts and emails (pastes) them to you, push the values into the matching Pace cycle count.</p>
       <div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px;font-size:12px;line-height:1.6">
         <ol style="margin:0 0 8px 18px;padding:0">
           <li>Open Pace in a desktop browser. Navigate to the <strong>same CC's detail page</strong> as the counter's CSV (e.g. CC 5085).</li>
@@ -938,15 +934,12 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
       <button class="modal-close" onclick="closeCountedList()" title="Close" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">✕</button>
     </div>
     <div class="modal-actions">
+      <button class="btn btn-primary" onclick="copyCSV('current')">📋 Copy CSV</button>
       <button class="btn btn-green" onclick="printCurrent()">🖨 Print</button>
-      <button class="btn btn-ghost" onclick="downloadCSV('current')">⬇ CSV</button>
-    </div>
-    <div class="modal-email-row">
-      <input type="email" id="countedEmail" placeholder="you@endlessedge.com" autocomplete="email">
-      <button class="btn btn-primary" onclick="emailFromCountedList()">✉ Email</button>
+      <button class="btn btn-ghost" onclick="downloadCSV('current')">⬇ CSV file</button>
     </div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:10px;color:var(--muted);line-height:1.5;margin-bottom:10px">
-      📄 <strong style="color:var(--text)">Save as PDF:</strong> Tap Print, then choose "Save as PDF" in the print dialog.
+      📋 <strong style="color:var(--text)">Send to manager:</strong> tap Copy CSV, then paste into an email. Don't send a file — the manager pastes this text into Pace.
     </div>
     <div class="counted-list" id="countedListBody"></div>
     <div class="modal-resize" id="countedModalResize"
@@ -1013,7 +1006,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-06-09-1319';
+const APP_VERSION = '2026-06-10-1455';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3062,9 +3055,8 @@ function downloadCSV(scope) {
 function copyCSV(scope) {
   const rows = scope === 'history' ? filteredHistoryForExport() : (counts[activeCC] || []);
   if (!rows.length) { showToast('Nothing to copy','err'); return; }
-  navigator.clipboard.writeText(buildCSV(scope))
-    .then(() => showToast('Copied!'))
-    .catch(() => showToast('Copy failed','err'));
+  // Robust copy (async clipboard with a textarea/execCommand fallback for iOS Safari quirks).
+  copyTextToClipboard(buildCSV(scope), 'CSV copied — paste it into your email');
 }
 async function emailReport(scope) {
   const email = document.getElementById('emailAddr').value.trim();
