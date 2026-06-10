@@ -174,6 +174,8 @@ body.fs-4 .tab{font-size:17px} body.fs-5 .tab{font-size:18px} body.fs-6 .tab{fon
 .pill.ver-pill.uptodate{background:var(--green);color:#000;border-color:var(--green)}
 .pill.ver-pill.outdated{background:var(--red);color:#fff;border-color:var(--red)}
 .pill.ver-pill.outdated{animation:verPulse 1.2s ease-in-out infinite}
+.pill.ver-pill.datastale{background:var(--gold);color:#000;border-color:var(--gold)}
+.pill.ver-pill.dataold{background:var(--red);color:#fff;border-color:var(--red)}
 @keyframes verPulse{0%,100%{opacity:1}50%{opacity:.55}}
 
 /* TABS */
@@ -449,8 +451,8 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
       <span class="pill-lbl">SYNC</span>
       <span id="syncPillTime">—</span>
     </div>
-    <div class="pill ver-pill" id="verPill" onclick="onVerPillClick()" title="App version" style="cursor:pointer">
-      <span class="pill-lbl">APP</span>
+    <div class="pill ver-pill" id="verPill" onclick="onVerPillClick()" title="Pace data date — tap to check for app updates" style="cursor:pointer">
+      <span class="pill-lbl" id="verPillLbl">DATA</span>
       <span id="verPillText">…</span>
     </div>
   </div>
@@ -745,7 +747,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
     <button class="acc-head" onclick="toggleAcc(this)"><span>🔄 Pull latest data from Pace</span><span class="acc-chevron">▾</span></button>
     <div class="acc-body">
       <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">The app auto-syncs when it opens. Tap below to force a refresh anytime. Your in-progress counts and history are kept.</p>
-      <div id="syncStatus" style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:10px;letter-spacing:.5px;word-break:break-word">Not synced yet</div>
+      <div id="syncStatus" style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:10px;letter-spacing:.5px;word-break:break-word;white-space:pre-line">Not synced yet</div>
       <button class="btn btn-green" onclick="syncNow()" style="margin:0">⬇ Sync Now</button>
     </div>
   </div>
@@ -1006,7 +1008,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-06-10-1455';
+const APP_VERSION = '2026-06-10-1531';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -2718,36 +2720,60 @@ const PACE_DATA_URL = 'https://gist.githubusercontent.com/endlessedge1997/dd6dd7
 // in the repo. On launch we fetch version.txt (cache-busted) and compare. If the live
 // version is newer than the one baked into the running page, this copy is stale.
 const VERSION_URL = 'https://endlessedge1997.github.io/Cycle-Counts/version.txt';
+// When the manager last scraped Pace and uploaded — written to the gist as scraped_at.txt.
+const DATA_STAMP_URL = 'https://gist.githubusercontent.com/endlessedge1997/dd6dd78a9c1644f0d5dd2ccd376bf366/raw/scraped_at.txt';
 let latestVersion = null;
+let appOutdated = false;   // true when a newer app build is available
 
-async function checkAppVersion() {
+// Short date/time like "6/10 2:55p".
+function fmtStamp(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  let h = d.getHours(); const ap = h >= 12 ? 'p' : 'a'; h = h % 12 || 12;
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + h + ':' + mm + ap;
+}
+function getDataStamp() {
+  try { const info = JSON.parse(localStorage.getItem('pcc_lastSync') || 'null'); return info && info.scrapedAt ? info.scrapedAt : null; } catch(e) { return null; }
+}
+// Decide what the header pill shows: "Update" if a new app build exists, otherwise the
+// Pace-data scrape date/time (color-coded by how old that data is).
+function refreshVerPill() {
   const pill = document.getElementById('verPill');
   const txt = document.getElementById('verPillText');
-  // TEST BUILD: when running as v2.html, never auto-redirect (the version marker reflects
-  // the live index.html, so a mismatch is expected and must NOT bounce us off the test page).
-  if (location.pathname.indexOf('v2.html') >= 0) {
-    if (txt) txt.textContent = 'TEST v2';
-    if (pill) { pill.classList.remove('uptodate','outdated'); }
+  const lbl = document.getElementById('verPillLbl');
+  if (!pill || !txt) return;
+  pill.classList.remove('uptodate','outdated','datastale','dataold');
+  if (location.pathname.indexOf('v2.html') >= 0) { if (lbl) lbl.textContent='APP'; txt.textContent = 'TEST v2'; return; }
+  if (appOutdated) {
+    if (lbl) lbl.textContent = 'APP';
+    txt.textContent = 'Update ↻';
+    pill.classList.add('outdated');
     return;
   }
-  if (txt) txt.textContent = APP_VERSION === 'dev' ? 'dev' : APP_VERSION;
+  // App is current (or version unknown) → show the Pace data date.
+  if (lbl) lbl.textContent = 'DATA';
+  const iso = getDataStamp();
+  const s = fmtStamp(iso);
+  if (!s) { txt.textContent = 'no data yet'; pill.classList.add('dataold'); return; }
+  txt.textContent = s;
+  const ageH = (Date.now() - new Date(iso).getTime()) / 3600000;
+  if (ageH < 24) pill.classList.add('uptodate');        // green: < 1 day old
+  else if (ageH < 72) pill.classList.add('datastale');  // gold: 1–3 days
+  else pill.classList.add('dataold');                   // red: > 3 days
+}
+
+async function checkAppVersion() {
+  if (location.pathname.indexOf('v2.html') >= 0) { refreshVerPill(); return; }
   try {
     const res = await fetch(VERSION_URL + '?t=' + Date.now(), { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     latestVersion = (await res.text()).trim();
     if (!latestVersion) throw new Error('empty version');
-    if (pill) pill.classList.remove('uptodate','outdated');
-    if (APP_VERSION === 'dev') {
-      // Running a local/unstamped copy — don't nag.
-      if (txt) txt.textContent = 'dev';
-      return;
-    }
-    if (latestVersion === APP_VERSION) {
-      if (pill) pill.classList.add('uptodate');
-      if (txt) txt.textContent = 'Up to date';
-    } else {
-      if (pill) pill.classList.add('outdated');
-      if (txt) txt.textContent = 'Update ↻';
+    appOutdated = (APP_VERSION !== 'dev' && latestVersion !== APP_VERSION);
+    refreshVerPill();
+    if (appOutdated) {
       // Auto-update once per session to avoid surprising a counter mid-shift with repeated reloads.
       let alreadyTried = false;
       try { alreadyTried = sessionStorage.getItem('pcc_autoUpdated') === latestVersion; } catch(e) {}
@@ -2757,8 +2783,9 @@ async function checkAppVersion() {
       }
     }
   } catch (err) {
-    // Offline or version.txt missing — just show the running version, no nag.
-    if (txt) txt.textContent = APP_VERSION === 'dev' ? 'dev' : 'v' + APP_VERSION;
+    // Offline or version.txt missing — just show the data date, no nag.
+    appOutdated = false;
+    refreshVerPill();
   }
 }
 
@@ -2808,7 +2835,10 @@ function updateSyncStatus(msg) {
                 : ageMin < 60 ? ageMin + 'm ago'
                 : ageMin < 1440 ? Math.floor(ageMin/60) + 'h ago'
                 : Math.floor(ageMin/1440) + 'd ago';
-  if (el) el.textContent = '✓ Last sync ' + agoStr + ' (' + new Date(info.at).toLocaleString() + ') · ' + info.ccCount + ' CCs · ' + info.totalRows + ' rows';
+  const dataLine = info.scrapedAt
+    ? '\nPace data scraped: ' + new Date(info.scrapedAt).toLocaleString()
+    : '\nPace data date: unknown (will show after the manager next uploads)';
+  if (el) el.textContent = '✓ You synced ' + agoStr + ' (' + new Date(info.at).toLocaleString() + ') · ' + info.ccCount + ' CCs · ' + info.totalRows + ' rows' + dataLine;
   if (pillTime) pillTime.textContent = agoStr;
   if (pill) {
     pill.classList.remove('fresh','stale','bad');
@@ -2872,11 +2902,18 @@ async function syncFromGist(silent) {
       };
       totalRows += Object.values(items).reduce((a,v) => a + v.bins.length, 0);
     });
+    // Fetch when the manager last scraped/uploaded (gist scraped_at.txt). Optional — older gists lack it.
+    let scrapedAt = null;
+    try {
+      const sr = await fetch(DATA_STAMP_URL + '?t=' + Date.now(), { cache: 'no-store' });
+      if (sr.ok) { const t = (await sr.text()).trim(); if (t) scrapedAt = t; }
+    } catch(e) {}
     persist();
-    try { localStorage.setItem('pcc_lastSync', JSON.stringify({ at: Date.now(), ccCount: ccKeys.length, totalRows })); } catch(e) {}
+    try { localStorage.setItem('pcc_lastSync', JSON.stringify({ at: Date.now(), ccCount: ccKeys.length, totalRows, scrapedAt })); } catch(e) {}
     renderAll();
     updateSyncStatus();
-    return { ok: true, ccCount: ccKeys.length, totalRows };
+    refreshVerPill();
+    return { ok: true, ccCount: ccKeys.length, totalRows, scrapedAt };
   } catch (err) {
     console.warn('Sync failed:', err);
     updateSyncStatus('⚠ Sync failed: ' + err.message);
@@ -2932,6 +2969,8 @@ async function uploadCsvToGist(event) {
   try {
     const body = {};
     body[GIST_FILENAME] = { content: csvText };
+    // Stamp the scrape/upload time so every device can see how fresh the data is.
+    body['scraped_at.txt'] = { content: new Date().toISOString() };
     const res = await fetch('https://api.github.com/gists/' + GIST_ID, {
       method: 'PATCH',
       headers: {
