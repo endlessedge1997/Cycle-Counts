@@ -98,8 +98,8 @@ header{background:linear-gradient(135deg,#0a0f1a 0%,#0e1a2e 100%);border-bottom:
 /* FONT SIZE SCALING (body.fs-1 = default; fs-2 = large; fs-3 = x-large) */
 body.fs-2 .ic-num,body.fs-2 .hist-num,body.fs-2 .lbl-item-num{font-size:14px}
 body.fs-2 .ic-desc,body.fs-2 .hist-desc,body.fs-2 .lbl-item-desc{font-size:17px}
-body.fs-2 .bin-loc,body.fs-2 .lbl-bin-loc{font-size:14px}
-body.fs-2 .bin-oh,body.fs-2 .bin-status,body.fs-2 .hist-meta,body.fs-2 .bin-cta,body.fs-2 .lbl-bin-lot,body.fs-2 .bin-lot{font-size:13px}
+body.fs-2 .bin-loc,body.fs-2 .lbl-bin-loc,body.fs-2 .bin-lot{font-size:14px}
+body.fs-2 .bin-oh,body.fs-2 .bin-status,body.fs-2 .hist-meta,body.fs-2 .bin-cta,body.fs-2 .lbl-bin-lot{font-size:13px}
 body.fs-2 .scan-banner input{font-size:22px}
 body.fs-2 .bin-qty-big,body.fs-2 .hist-qty{font-size:24px}
 body.fs-2 .ic-badge{font-size:12px}
@@ -122,8 +122,8 @@ body.fs-2 .pill{font-size:12px}
 
 body.fs-3 .ic-num,body.fs-3 .hist-num,body.fs-3 .lbl-item-num{font-size:16px}
 body.fs-3 .ic-desc,body.fs-3 .hist-desc,body.fs-3 .lbl-item-desc{font-size:20px}
-body.fs-3 .bin-loc,body.fs-3 .lbl-bin-loc{font-size:16px}
-body.fs-3 .bin-oh,body.fs-3 .bin-status,body.fs-3 .hist-meta,body.fs-3 .bin-cta,body.fs-3 .lbl-bin-lot,body.fs-3 .bin-lot{font-size:15px}
+body.fs-3 .bin-loc,body.fs-3 .lbl-bin-loc,body.fs-3 .bin-lot{font-size:16px}
+body.fs-3 .bin-oh,body.fs-3 .bin-status,body.fs-3 .hist-meta,body.fs-3 .bin-cta,body.fs-3 .lbl-bin-lot{font-size:15px}
 body.fs-3 .scan-banner input{font-size:26px}
 body.fs-3 .bin-qty-big,body.fs-3 .hist-qty{font-size:28px}
 body.fs-3 .ic-badge{font-size:14px}
@@ -148,7 +148,7 @@ body.fs-3 .pill{font-size:13px}
 body.fs-4 .ic-num{font-size:18px} body.fs-5 .ic-num{font-size:21px} body.fs-6 .ic-num{font-size:24px}
 body.fs-4 .ic-desc{font-size:24px} body.fs-5 .ic-desc{font-size:28px} body.fs-6 .ic-desc{font-size:33px}
 body.fs-4 .bin-loc{font-size:19px} body.fs-5 .bin-loc{font-size:23px} body.fs-6 .bin-loc{font-size:27px}
-body.fs-4 .bin-lot{font-size:18px} body.fs-5 .bin-lot{font-size:22px} body.fs-6 .bin-lot{font-size:26px}
+body.fs-4 .bin-lot{font-size:19px} body.fs-5 .bin-lot{font-size:23px} body.fs-6 .bin-lot{font-size:27px}
 body.fs-4 .bin-oh,body.fs-4 .bin-status,body.fs-4 .bin-cta{font-size:17px} body.fs-5 .bin-oh,body.fs-5 .bin-status,body.fs-5 .bin-cta{font-size:20px} body.fs-6 .bin-oh,body.fs-6 .bin-status,body.fs-6 .bin-cta{font-size:23px}
 body.fs-4 .bin-qty-big{font-size:32px} body.fs-5 .bin-qty-big{font-size:38px} body.fs-6 .bin-qty-big{font-size:44px}
 body.fs-4 .note-line{font-size:14px} body.fs-5 .note-line{font-size:17px} body.fs-6 .note-line{font-size:20px}
@@ -241,6 +241,7 @@ label.field-label{font-family:var(--head);font-size:11px;letter-spacing:1.5px;te
 .bin-remove{background:var(--surface2);border:1px solid var(--border);color:var(--red);font-size:14px;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent;padding:0;line-height:1;font-weight:bold}
 .bin-remove:active{background:var(--red);color:#fff;transform:scale(.92)}
 .bin-loc{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:1px}
+.bin-lot{font-size:12px}
 .bin-oh{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
 .bin-status{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:.5px}
 .bin-status.counted{color:var(--green)}
@@ -452,7 +453,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
       <span id="syncPillTime">—</span>
     </div>
     <div class="pill ver-pill" id="verPill" onclick="onVerPillClick()" title="Pace data date — tap to check for app updates" style="cursor:pointer">
-      <span class="pill-lbl" id="verPillLbl">DATA</span>
+      <span class="pill-lbl" id="verPillLbl">Last</span>
       <span id="verPillText">…</span>
     </div>
   </div>
@@ -1008,7 +1009,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-06-10-1531';
+const APP_VERSION = '2026-06-11-0744';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1301,7 +1302,7 @@ function renderItems() {
         const status = cur
           ? `<div class="bin-status counted">✓ ${cur.countQty} ${esc(b.uom || 'EA')} · ${esc(cur.by || '?')} · ${esc(cur.date || '')} ${esc(cur.time || '')}</div>`
           : `<div class="bin-status">Not counted yet</div>`;
-        const lotLine = b.lot ? `<div class="bin-lot" style="font-family:var(--mono);font-size:11px;color:var(--gold);margin-top:2px;letter-spacing:.5px">LOT: ${esc(b.lotLabel || b.lot)}${b.lotLabel && b.lot !== b.lotLabel ? ' (#' + esc(b.lot) + ')' : ''}</div>` : '';
+        const lotLine = b.lot ? `<div class="bin-lot" style="font-family:var(--mono);color:var(--gold);margin-top:2px;letter-spacing:.5px">LOT: ${esc(b.lotLabel || b.lot)}${b.lotLabel && b.lot !== b.lotLabel ? ' (#' + esc(b.lot) + ')' : ''}</div>` : '';
         const transferTag = b.added ? `<span style="display:inline-block;font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;background:var(--gold);color:#000;border-radius:100px;padding:1px 7px;margin-left:6px">⇄ TRANSFER</span>` : '';
         const ohLine = b.added
           ? `<div class="bin-oh" style="color:var(--gold)">New location — not in Pace yet</div>`
@@ -1873,7 +1874,13 @@ function renderHistory() {
   const chips = ['ALL'].concat(ccIds);
   if (!chips.includes(histCcFilter)) histCcFilter = 'ALL';
   filters.innerHTML = chips.map(id => {
-    const label = id === 'ALL' ? 'All Cycle Counts' : 'CC ' + id;
+    let label;
+    if (id === 'ALL') { label = 'All Cycle Counts'; }
+    else {
+      const cc = cycleCounts[id];
+      const nm = (cc && cc.name) ? cc.name : '';
+      label = 'CC ' + id + (nm ? ' · ' + nm : '');
+    }
     return `<div class="hist-chip${id === histCcFilter ? ' active' : ''}" onclick="setHistCcFilter('${esc(id).replace(/'/g,"\\'")}')">${esc(label)}</div>`;
   }).join('');
   let filtered = history.slice().reverse();
@@ -2753,7 +2760,7 @@ function refreshVerPill() {
     return;
   }
   // App is current (or version unknown) → show the Pace data date.
-  if (lbl) lbl.textContent = 'DATA';
+  if (lbl) lbl.textContent = 'Last';
   const iso = getDataStamp();
   const s = fmtStamp(iso);
   if (!s) { txt.textContent = 'no data yet'; pill.classList.add('dataold'); return; }
