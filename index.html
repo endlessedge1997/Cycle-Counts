@@ -230,6 +230,14 @@ label.field-label{font-family:var(--head);font-size:11px;letter-spacing:1.5px;te
 .ic-desc{font-family:var(--head);font-weight:600;font-size:15px;color:var(--text);flex:1;min-width:0}
 .ic-badge{font-family:var(--mono);font-size:10px;letter-spacing:1px;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:100px;padding:2px 8px;flex-shrink:0}
 .ic-badge.done{background:var(--green);color:#000;border-color:var(--green)}
+/* View toggle (By Item / By Bin) */
+.view-toggle{display:flex;gap:0;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.view-toggle button{flex:1;border:none;background:var(--surface2);color:var(--muted);font-family:var(--head);font-weight:700;font-size:13px;letter-spacing:1px;padding:11px 6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.view-toggle button.active{background:var(--accent2);color:#fff}
+/* Bin-view header */
+.bincard-head .ic-desc{color:var(--accent);letter-spacing:1px;font-family:var(--mono);font-size:13px}
+.bin-row .br-item-num{font-family:var(--mono);color:var(--gold);font-size:12px;letter-spacing:1px}
+.bin-row .br-item-desc{font-family:var(--head);font-weight:600;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bin-row{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .bin-row:last-child{border-bottom:none}
 .bin-row.counted{background:rgba(39,201,122,.06)}
@@ -479,6 +487,10 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
   <div class="progress-wrap" id="progressWrap" style="display:none">
     <span class="progress-text" id="progressText">0 of 0</span>
     <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="view-toggle" id="viewToggle">
+    <button id="viewItemBtn" onclick="setCountView('item')">📦 By Item</button>
+    <button id="viewBinBtn" onclick="setCountView('bin')">🗺 By Bin (A–Z)</button>
   </div>
   <div id="itemList"></div>
 </div>
@@ -1009,7 +1021,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-06-11-0744';
+const APP_VERSION = '2026-07-06-1023';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1042,6 +1054,7 @@ let entryCtx = null;
 let noteCtx = null;        // { ccId, itemNum } for the open note modal
 let addBinCtx = null;      // itemNum for the open Add/Transfer Bin modal
 let histCcFilter = 'ALL';
+let countView = 'item';    // 'item' or 'bin' — how the Count tab is grouped
 const expandedCards = new Set();
 // Per-line font/color editor state — declared here (not lower) so init()'s loadFontPrefs() never hits a TDZ.
 let fontPrefs = {};
@@ -1064,6 +1077,7 @@ const FONT_ELEMENTS = [
   try { hiddenBins   = new Set(JSON.parse(localStorage.getItem('pcc_hiddenBins') || '[]')); } catch(e) { hiddenBins = new Set(); }
   try { hideZeroOH   = localStorage.getItem('pcc_hideZeroOH') === '1'; } catch(e) { hideZeroOH = false; }
   try { addedBins    = JSON.parse(localStorage.getItem('pcc_addedBins') || '{}'); } catch(e) { addedBins = {}; }
+  try { countView    = (localStorage.getItem('pcc_countView') === 'bin') ? 'bin' : 'item'; } catch(e) { countView = 'item'; }
   try { activeCC     = localStorage.getItem('pcc_activeCC') || ''; } catch(e) { activeCC = ''; }
   try { operator     = localStorage.getItem('pcc_op') || ''; } catch(e) { operator = ''; }
 
@@ -1255,12 +1269,20 @@ function renderItems() {
     </div>`;
     return;
   }
+  // Reflect the active view on the toggle.
+  const viBtn = document.getElementById('viewItemBtn'), vbBtn = document.getElementById('viewBinBtn');
+  if (viBtn) viBtn.classList.toggle('active', countView !== 'bin');
+  if (vbBtn) vbBtn.classList.toggle('active', countView === 'bin');
+
   const ccCounts = counts[activeCC] || [];
   const itemNums = Object.keys(cc.items).sort((a,b) => {
     const an = parseInt(a, 10), bn = parseInt(b, 10);
     if (!isNaN(an) && !isNaN(bn) && an !== bn) return an - bn;
     return a.localeCompare(b);
   });
+
+  if (countView === 'bin') { renderBinView(wrap, cc, ccCounts, itemNums); return; }
+
   wrap.innerHTML = itemNums.map(num => {
     const item = cc.items[num];
     const bins = visibleBins(num, item).slice().sort((a,b) => {
@@ -1343,6 +1365,97 @@ function toggleItemCard(num) {
   if (!wasExpanded) {
     expandedCards.add(num);
     const card = document.getElementById('card-' + num);
+    if (card) card.classList.add('expanded');
+  }
+}
+
+// COUNT VIEW: BY ITEM / BY BIN ─────────────────────────
+function setCountView(v) {
+  countView = (v === 'bin') ? 'bin' : 'item';
+  try { localStorage.setItem('pcc_countView', countView); } catch(e) {}
+  expandedCards.clear();
+  renderItems();
+}
+// Stable DOM id for a bin card from its (arbitrary) label.
+function binCardId(label) { return 'bincard-' + String(label).replace(/[^a-zA-Z0-9]/g, '_'); }
+
+// Render the Count tab grouped by BIN LOCATION, sorted A–Z. Each bin card lists the
+// items (and lots) stored there. Tapping a row opens the same count keypad as item view.
+function renderBinView(wrap, cc, ccCounts, itemNums) {
+  const binMap = {};
+  itemNums.forEach(num => {
+    const item = cc.items[num];
+    visibleBins(num, item).forEach(b => {
+      if (!binMap[b.bin]) binMap[b.bin] = [];
+      binMap[b.bin].push({ num, item, b });
+    });
+  });
+  const binLabels = Object.keys(binMap).sort((a,b) => a.localeCompare(b, undefined, { numeric: true }));
+  if (!binLabels.length) { wrap.innerHTML = '<div class="empty"><span class="icon">🗺</span>No bin locations to show.</div>'; return; }
+
+  wrap.innerHTML = binLabels.map(binLabel => {
+    const entries = binMap[binLabel].slice().sort((a,b) => {
+      const an = parseInt(a.num,10), bn = parseInt(b.num,10);
+      if (!isNaN(an) && !isNaN(bn) && an !== bn) return an - bn;
+      return a.num.localeCompare(b.num);
+    });
+    const countedN = entries.filter(e => ccCounts.find(c => c.itemNum === e.num && c.bin === e.b.bin && (c.lot||'') === (e.b.lot||''))).length;
+    const allDone = countedN === entries.length;
+    const partial = countedN > 0 && !allDone;
+    const badge = allDone ? '<span class="ic-badge done">✓ ALL</span>'
+                : partial ? `<span class="ic-badge" style="border-color:var(--gold);color:var(--gold)">${countedN}/${entries.length}</span>`
+                : `<span class="ic-badge">${entries.length}</span>`;
+    const cid = binCardId(binLabel);
+    const expCls = expandedCards.has(cid) ? ' expanded' : '';
+    const escCid = cid.replace(/'/g,"\\'");
+    return `<div class="item-card${allDone ? ' all-counted' : ''}${expCls}" id="${cid}">
+      <div class="ic-head bincard-head" onclick="toggleBinCard('${escCid}')">
+        <span class="ic-desc">${esc(binLabel)}</span>
+        ${badge}
+        <span class="ic-chevron">▾</span>
+      </div>
+      <div class="bin-list">
+      ${entries.map(e => {
+        const num = e.num, item = e.item, b = e.b;
+        const cur = ccCounts.find(c => c.itemNum === num && c.bin === b.bin && (c.lot||'') === (b.lot||''));
+        const status = cur
+          ? `<div class="bin-status counted">✓ ${cur.countQty} ${esc(b.uom || 'EA')} · ${esc(cur.by || '?')} · ${esc(cur.date || '')} ${esc(cur.time || '')}</div>`
+          : `<div class="bin-status">Not counted yet</div>`;
+        const lotLine = b.lot ? `<div class="bin-lot" style="font-family:var(--mono);color:var(--gold);margin-top:2px;letter-spacing:.5px">LOT: ${esc(b.lotLabel || b.lot)}</div>` : '';
+        const transferTag = b.added ? `<span style="display:inline-block;font-family:var(--mono);font-size:9px;font-weight:bold;letter-spacing:1px;background:var(--gold);color:#000;border-radius:100px;padding:1px 7px;margin-left:6px">⇄ TRANSFER</span>` : '';
+        const ohLine = b.added
+          ? `<div class="bin-oh" style="color:var(--gold)">New location — not in Pace yet</div>`
+          : `<div class="bin-oh">Pace On Hand: ${b.oh}${b.uom ? ' ' + esc(b.uom) : ''}</div>`;
+        const escNum = esc(num).replace(/'/g,"\\'");
+        const escBin = esc(b.bin).replace(/'/g,"\\'");
+        const escLot = esc(b.lot || '').replace(/'/g,"\\'");
+        const openCall = `openEntry('${escNum}', '${escBin}', '${escLot}')`;
+        return `<div class="bin-row${cur ? ' counted' : ''}"${b.added ? ' style="background:rgba(245,166,35,.07)"' : ''}>
+          <div class="bin-info" onclick="${openCall}">
+            <div><span class="br-item-num">#${esc(num)}</span>${transferTag}</div>
+            <div class="br-item-desc">${esc(item.desc)}</div>
+            ${lotLine}
+            ${ohLine}
+            ${status}
+          </div>
+          <div class="bin-actions">
+            <div class="bin-cta-wrap" onclick="${openCall}">
+              ${cur ? `<div class="bin-qty-big">${cur.countQty}</div>` : `<div class="bin-cta">TAP TO COUNT ›</div>`}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleBinCard(cid) {
+  const wasExpanded = expandedCards.has(cid);
+  expandedCards.clear();
+  document.querySelectorAll('.item-card').forEach(c => c.classList.remove('expanded'));
+  if (!wasExpanded) {
+    expandedCards.add(cid);
+    const card = document.getElementById(cid);
     if (card) card.classList.add('expanded');
   }
 }
@@ -1600,6 +1713,28 @@ function resolveScan(code) {
   setScanStatus('✓ Matched "' + code + '" → item #' + num, true);
   scanInput.value = '';
   const item = cc.items[num];
+  const vbins = visibleBins(num, item);
+
+  if (countView === 'bin') {
+    // Bin view: cards are per-bin. If the item sits in exactly one bin/lot, open it.
+    // Otherwise expand + scroll to the first bin card that contains this item.
+    if (vbins.length === 1) { openEntry(num, vbins[0].bin, vbins[0].lot || ''); return; }
+    const targetCid = vbins.length ? binCardId(vbins[0].bin) : null;
+    expandedCards.clear();
+    document.querySelectorAll('.item-card').forEach(c => c.classList.remove('highlight','expanded'));
+    if (targetCid) {
+      expandedCards.add(targetCid);
+      const card = document.getElementById(targetCid);
+      if (card) {
+        card.classList.add('highlight', 'expanded');
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => card.classList.remove('highlight'), 2000);
+      }
+      setScanStatus('✓ #' + num + ' is in ' + vbins.length + ' bin(s) — opened ' + vbins[0].bin, true);
+    }
+    return;
+  }
+
   expandedCards.clear();
   expandedCards.add(num);
   document.querySelectorAll('.item-card').forEach(c => {
@@ -1612,8 +1747,8 @@ function resolveScan(code) {
     card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setTimeout(() => card.classList.remove('highlight'), 2000);
   }
-  if (item.bins.length === 1) {
-    openEntry(num, item.bins[0].bin, item.bins[0].lot || '');
+  if (vbins.length === 1) {
+    openEntry(num, vbins[0].bin, vbins[0].lot || '');
   }
 }
 
