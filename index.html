@@ -44,6 +44,8 @@ body.light .pill.count-pill, body.light .pill.count-pill *,
 body.light .np-key:active,
 body.light .tab.active { color: #fff !important; }
 body.light .tab.active { background: var(--accent2) !important; }
+/* Green count pill (something counted) keeps black text for contrast */
+body.light .pill.count-pill.has-counts, body.light .pill.count-pill.has-counts * { color: #000 !important; }
 
 /* The gradient brand logos: solid black instead of gradient fill */
 body.light .logo-main,
@@ -166,6 +168,7 @@ body.fs-4 .tab{font-size:17px} body.fs-5 .tab{font-size:18px} body.fs-6 .tab{fon
 .pill .pill-lbl{color:var(--muted);font-size:9px}
 .pill.cc-pill{border-color:var(--accent2);color:var(--accent)}
 .pill.count-pill{background:var(--accent2);color:#fff;border-color:var(--accent)}
+.pill.count-pill.has-counts{background:var(--green);color:#000;border-color:var(--green)}
 .pill.sync-pill{background:var(--surface2);color:var(--text);border-color:var(--border)}
 .pill.sync-pill.fresh{background:var(--green);color:#000;border-color:var(--green)}
 .pill.sync-pill.stale{background:var(--gold);color:#000;border-color:var(--gold)}
@@ -453,7 +456,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
       <span class="pill-lbl">CC</span>
       <span id="ccPillName">—</span>
     </div>
-    <div class="pill count-pill" title="Tap to view & export counted items" onclick="openCountedList()" style="cursor:pointer">
+    <div class="pill count-pill" id="countPill" title="Tap to view & export counted items" onclick="openCountedList()" style="cursor:pointer">
       <span id="counterText">0/0</span>
     </div>
     <div class="pill sync-pill" id="syncPill" onclick="syncNow()" title="Tap to pull latest Pace data" style="cursor:pointer">
@@ -956,6 +959,13 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:10px;color:var(--muted);line-height:1.5;margin-bottom:10px">
       📋 <strong style="color:var(--text)">Send to manager:</strong> tap Copy CSV, then paste into an email. Don't send a file — the manager pastes this text into Pace.
     </div>
+    <div style="border:1px solid var(--gold);border-radius:8px;padding:10px;margin-bottom:10px">
+      <button class="btn btn-gold" style="margin:0" onclick="finalizeAndClear()">✔ Finalize &amp; Clear Current Counts</button>
+      <div style="font-size:10px;color:var(--muted);line-height:1.5;margin-top:8px">
+        Use this once you've <strong style="color:var(--text)">sent this count to the manager</strong>. It stamps the finalized date/time and clears the current counts so you can start a fresh pass — the count pill turns blue again. Your History is kept.
+      </div>
+      <div id="lastFinalized" style="font-family:var(--mono);font-size:10px;color:var(--gold);margin-top:6px;letter-spacing:.5px">Last finalized: never</div>
+    </div>
     <div class="counted-list" id="countedListBody"></div>
     <div class="modal-resize" id="countedModalResize"
          onmousedown="startModalResize(event)" ontouchstart="startModalResize(event)" title="Drag to resize"></div>
@@ -1021,7 +1031,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-07-06-1023';
+const APP_VERSION = '2026-07-06-1041';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1145,6 +1155,9 @@ function renderHeader() {
   document.getElementById('ccPillName').textContent = label;
   const totals = activeCCTotals();
   document.getElementById('counterText').textContent = totals.counted + '/' + totals.total;
+  // Count pill: GREEN when something is counted, BLUE when nothing yet.
+  const cpill = document.getElementById('countPill');
+  if (cpill) cpill.classList.toggle('has-counts', totals.counted > 0);
 }
 
 // CC CHOOSER ────────────────────────────────────────
@@ -1924,6 +1937,8 @@ function renderCountedList() {
   const ccCounts = (counts[activeCC] || []).slice().sort((a,b) => (b.at||0) - (a.at||0));
   document.getElementById('countedTitle').textContent =
     'CC ' + (cc ? cc.id : '—') + ' · ' + ccCounts.length + ' counted';
+  const lf = document.getElementById('lastFinalized');
+  if (lf) lf.textContent = 'Last finalized: ' + ((cc && cc.finalizedAt) ? new Date(cc.finalizedAt).toLocaleString() : 'never');
   const body = document.getElementById('countedListBody');
   if (!ccCounts.length) {
     body.innerHTML = `<div class="empty"><span class="icon">📦</span>Nothing counted yet.</div>`;
@@ -3148,6 +3163,21 @@ async function uploadCsvToGist(event) {
 }
 
 // FINALIZE / RESETS ────────────────────────────────────────
+// From the counted-items popup: stamp the finalized time AND clear the current pass so the
+// count pill returns to blue (0 counted). History is retained (each count was logged there).
+function finalizeAndClear() {
+  const cc = cycleCounts[activeCC];
+  if (!cc) { showToast('No active cycle count','err'); return; }
+  const n = (counts[activeCC] || []).length;
+  if (!confirm('Finalize CC ' + activeCC + (cc.name ? ' (' + cc.name + ')' : '') + ' and clear the current counts?\n\n' +
+               n + ' counted row(s) will be cleared for a fresh pass. History is kept. Make sure you already sent this count to the manager.')) return;
+  cc.finalizedAt = Date.now();
+  counts[activeCC] = [];
+  persist();
+  renderAll();
+  renderCountedList();  // refresh the open popup (list empties, last-finalized updates)
+  showToast('Finalized & cleared — pill reset to blue');
+}
 function finalizeCC() {
   if (!cycleCounts[activeCC]) return;
   const totals = activeCCTotals();
