@@ -839,6 +839,17 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
     </div>
   </div>
 
+  <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>🖨 C. Print variance report</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
+        Paste the <strong>same CSV</strong> the counter sent you. This prints a report showing, per location: what the <strong>system had before</strong> (Pace on-hand), what was <strong>counted</strong>, and the <strong>variance</strong> — with the cycle count name and date.
+      </p>
+      <textarea id="reportCsv" placeholder='Paste the counter&apos;s CSV here — starts with "Cycle Count","Item Number",…' style="width:100%;min-height:90px;max-height:40vh;resize:vertical;font-family:var(--mono);font-size:11px;line-height:1.4;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);margin-bottom:10px"></textarea>
+      <button class="btn btn-green" onclick="printVarianceReport()" style="margin:0">🖨 Generate &amp; Print Report</button>
+    </div>
+  </div>
+
   <!-- ADVANCED -->
   <div style="background:linear-gradient(90deg,var(--muted) 0%,transparent 100%);padding:6px 12px;border-radius:6px;margin:24px 0 8px">
     <div style="font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:2px;color:#fff">⚙ ADVANCED / RARELY USED</div>
@@ -1031,7 +1042,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-07-06-1041';
+const APP_VERSION = '2026-08-06-1431';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3401,6 +3412,120 @@ function printCurrent() {
   `;
   window.print();
   pa.innerHTML = '';
+}
+
+// VARIANCE REPORT (manager) ────────────────────────────
+// Builds a printable report from the counter's pasted CSV: system on-hand (before) vs
+// counted vs variance, with the cycle count name and date. Everything comes from the CSV.
+function printVarianceReport() {
+  const raw = (document.getElementById('reportCsv').value || '').trim();
+  if (!raw) { showToast('Paste the counter\'s CSV first', 'err'); return; }
+  let rows;
+  try { rows = parseCsv(raw); } catch(e) { showToast('Could not read that CSV', 'err'); return; }
+  if (rows.length < 2) { showToast('CSV looks empty', 'err'); return; }
+  const H = rows[0].map(h => String(h || '').trim().toLowerCase());
+  const idx = name => H.indexOf(name);
+  const iCC = idx('cycle count'), iItem = idx('item number'), iDesc = idx('description'),
+        iBin = idx('bin'), iLotId = idx('lot id'), iLotLabel = idx('lot label'),
+        iOh = idx('on hand'), iQty = idx('count qty'), iBy = idx('by'), iDate = idx('date');
+  if (iItem < 0 || iOh < 0 || iQty < 0) {
+    showToast('CSV missing required columns (Item / On Hand / Count Qty)', 'err');
+    return;
+  }
+  const data = [];
+  let ccId = '', operator = '', countDate = '';
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (row.length === 1 && !row[0]) continue;
+    const item = String(row[iItem] || '').trim();
+    if (!item) continue;
+    if (!ccId && iCC >= 0) ccId = String(row[iCC] || '').trim();
+    if (!operator && iBy >= 0) operator = String(row[iBy] || '').trim();
+    if (!countDate && iDate >= 0) countDate = String(row[iDate] || '').trim();
+    const oh = parseFloat(row[iOh]) || 0;
+    const qty = parseFloat(row[iQty]) || 0;
+    data.push({
+      item,
+      desc: iDesc >= 0 ? String(row[iDesc] || '').trim() : '',
+      bin: iBin >= 0 ? String(row[iBin] || '').trim() : '',
+      lot: (iLotLabel >= 0 && row[iLotLabel]) ? String(row[iLotLabel]).trim() : (iLotId >= 0 ? String(row[iLotId] || '').trim() : ''),
+      oh, qty, variance: qty - oh
+    });
+  }
+  if (!data.length) { showToast('No data rows found in the CSV', 'err'); return; }
+  // Sort by bin (location), then item number.
+  data.sort((a, b) => {
+    const c = a.bin.localeCompare(b.bin, undefined, { numeric: true });
+    if (c !== 0) return c;
+    const an = parseInt(a.item, 10), bn = parseInt(b.item, 10);
+    if (!isNaN(an) && !isNaN(bn) && an !== bn) return an - bn;
+    return a.item.localeCompare(b.item);
+  });
+  const ccName = (cycleCounts[ccId] && cycleCounts[ccId].name) ||
+                 (typeof SEED_CCS !== 'undefined' && SEED_CCS[ccId] ? SEED_CCS[ccId].name : '') || '';
+  const fnum = n => {
+    const v = Math.round(n * 1000) / 1000;
+    return (Number.isInteger(v) ? v.toString() : v.toFixed(3).replace(/0+$/,'').replace(/\.$/,''));
+  };
+  const varCount = data.filter(d => Math.abs(d.variance) > 0.0001).length;
+  const bodyRows = data.map(d => {
+    const vpos = d.variance > 0.0001, vneg = d.variance < -0.0001;
+    const vcolor = vneg ? 'color:#c00;font-weight:bold' : vpos ? 'color:#0a7;font-weight:bold' : 'color:#888';
+    const vtext = (d.variance > 0 ? '+' : '') + fnum(d.variance);
+    return `<tr>
+      <td>${esc(d.item)}</td>
+      <td class="desc">${esc(d.desc)}</td>
+      <td>${esc(d.bin)}</td>
+      <td>${esc(d.lot)}</td>
+      <td class="num">${fnum(d.oh)}</td>
+      <td class="num">${fnum(d.qty)}</td>
+      <td class="num" style="${vcolor}">${vtext}</td>
+    </tr>`;
+  }).join('');
+  const css =
+    '@page{margin:12mm 10mm;size:portrait}' +
+    '*{box-sizing:border-box;margin:0;padding:0}' +
+    'body{font-family:Arial,sans-serif;color:#000;font-size:9pt}' +
+    '.hd{border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}' +
+    '.hd h1{font-size:15pt;margin-bottom:2px}' +
+    '.hd .sub{font-size:10pt;color:#333}' +
+    '.hd .meta{font-size:8.5pt;color:#555;margin-top:3px}' +
+    'table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-top:6px}' +
+    'th{background:#0072ff;color:#fff;text-align:left;padding:4px 6px;border:1px solid #0060dd;font-size:8pt;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    'td{padding:3px 6px;border-bottom:1px solid #ddd;vertical-align:top}' +
+    'tr:nth-child(even) td{background:#f2f6ff;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    '.num{text-align:right;white-space:nowrap}' +
+    '.desc{word-break:break-word}' +
+    'tfoot td{border-top:2px solid #000;font-weight:bold;background:#fff}' +
+    '.summary{margin-top:8px;font-size:9pt}' +
+    '.toolbar{position:fixed;top:8px;right:8px;background:#0072ff;color:#fff;padding:8px 12px;border-radius:6px;font-size:11px}' +
+    '.toolbar button{background:#fff;color:#0072ff;border:none;padding:5px 12px;border-radius:4px;font-weight:bold;margin-left:6px;cursor:pointer}' +
+    '@media print{.toolbar{display:none}}';
+  const totalOh = data.reduce((a,d)=>a+d.oh,0), totalQty = data.reduce((a,d)=>a+d.qty,0);
+  const totalVar = totalQty - totalOh;
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Variance Report — CC ' + esc(ccId) + '</title><style>' + css + '</style></head><body>' +
+    '<div class="toolbar">Variance Report <button onclick="window.print()">Print</button></div>' +
+    '<div class="hd">' +
+      '<h1>Cycle Count Variance Report</h1>' +
+      '<div class="sub">CC ' + esc(ccId) + (ccName ? ' — ' + esc(ccName) : '') + '</div>' +
+      '<div class="meta">Counted by ' + esc(operator || '—') + (countDate ? ' · Count date ' + esc(countDate) : '') + ' · Printed ' + new Date().toLocaleString() + ' · ' + data.length + ' rows · ' + varCount + ' with variance</div>' +
+    '</div>' +
+    '<table><thead><tr>' +
+      '<th>Item #</th><th>Description</th><th>Bin / Location</th><th>Lot</th>' +
+      '<th style="text-align:right">System On-Hand</th><th style="text-align:right">Counted</th><th style="text-align:right">Variance</th>' +
+    '</tr></thead><tbody>' + bodyRows + '</tbody>' +
+    '<tfoot><tr><td colspan="4">TOTALS</td>' +
+      '<td class="num">' + fnum(totalOh) + '</td><td class="num">' + fnum(totalQty) + '</td>' +
+      '<td class="num" style="' + (totalVar<0?'color:#c00':totalVar>0?'color:#0a7':'') + '">' + (totalVar>0?'+':'') + fnum(totalVar) + '</td></tr></tfoot>' +
+    '</table>' +
+    '<div class="summary">Rows with a variance: <strong>' + varCount + '</strong> of ' + data.length + '</div>' +
+    '</body></html>';
+  const win = window.open('', '_blank', 'width=900,height=1100');
+  if (!win) { showToast('Popup blocked — allow popups, then retry', 'err'); return; }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => { try { win.focus(); win.print(); } catch(e){} }, 300);
 }
 
 function printHistory() {
