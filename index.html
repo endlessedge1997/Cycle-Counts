@@ -434,6 +434,17 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 </head>
 <body>
 
+<!-- WHO'S COUNTING GATE -->
+<div id="operatorGate" class="hidden">
+  <div class="og-logo">Endless Edge</div>
+  <div class="og-sub">PRINTING CYCLE COUNT &middot; LOT TRACKED</div>
+  <div class="og-h2">Who's counting?</div>
+  <div class="op-list" id="opList"></div>
+  <input type="text" id="opOther" class="op-other" placeholder="+ Type your name" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();addOperatorName();}">
+  <button class="btn btn-green" onclick="addOperatorName()" style="max-width:340px;width:100%;margin-top:10px">Add &amp; Start Counting</button>
+  <div class="og-foot">YOUR NAME IS SAVED ON THIS DEVICE &middot; IT TAGS EVERY COUNT</div>
+</div>
+
 <!-- CC CHOOSER -->
 <div id="ccChooser" class="hidden">
   <button class="ccc-close" onclick="closeCcChooser()" title="Close">&times;</button>
@@ -452,6 +463,10 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
   <div class="h-right">
     <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
     <button class="theme-btn fs-btn" id="fsBtn" onclick="openFontEditor()" title="Font &amp; color settings">A</button>
+    <div class="pill op-pill" id="opPill" onclick="showOperatorGate()" title="Who's counting — tap to change" style="cursor:pointer">
+      <span class="pill-lbl">👤</span>
+      <span id="opPillName">—</span>
+    </div>
     <div class="pill cc-pill" id="ccPill" onclick="openCcChooser()" title="Switch cycle count">
       <span class="pill-lbl">CC</span>
       <span id="ccPillName">—</span>
@@ -752,6 +767,15 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
   </div>
 
   <div class="acc">
+    <button class="acc-head" onclick="toggleAcc(this)"><span>🧍 Who's counting (your name)</span><span class="acc-chevron">▾</span></button>
+    <div class="acc-body">
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px">Every count you log is tagged with this name, so the manager's report and History show <strong>who counted what</strong>. Set it once — it stays on this device.</p>
+      <div id="opCurrentLbl" style="font-family:var(--mono);font-size:12px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:10px;letter-spacing:.5px">Counting as: —</div>
+      <button class="btn btn-primary" onclick="showOperatorGate()" style="margin:0">Change / pick name</button>
+    </div>
+  </div>
+
+  <div class="acc">
     <button class="acc-head" onclick="toggleAcc(this)"><span>📋 Active cycle count</span><span class="acc-chevron">▾</span></button>
     <div class="acc-body">
       <select id="ccSelect" onchange="switchActiveCC(this.value)" style="margin-bottom:8px"></select>
@@ -1042,7 +1066,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-08-10-1528';
+const APP_VERSION = '2026-08-10-1536';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1069,6 +1093,7 @@ let hideZeroOH = false;    // when true, hide bins Pace shows as 0 on hand (unle
 let addedBins = {};        // addedBins[ccId][itemNum] = [{bin,lot,lotLabel,oh,uom,added:true}] — transfer/new locations
 let activeCC = '';
 let operator = '';
+let roster = [];           // list of counter names saved on THIS device for the "Who's counting?" picker
 let pendingImport = null;
 let npCurrent = '0';
 let entryCtx = null;
@@ -1101,6 +1126,10 @@ const FONT_ELEMENTS = [
   try { countView    = (localStorage.getItem('pcc_countView') === 'bin') ? 'bin' : 'item'; } catch(e) { countView = 'item'; }
   try { activeCC     = localStorage.getItem('pcc_activeCC') || ''; } catch(e) { activeCC = ''; }
   try { operator     = localStorage.getItem('pcc_op') || ''; } catch(e) { operator = ''; }
+  try { roster       = JSON.parse(localStorage.getItem('pcc_roster') || '[]'); } catch(e) { roster = []; }
+  if (!Array.isArray(roster)) roster = [];
+  // Make sure the current name is always in the picker list.
+  if (operator && roster.indexOf(operator) < 0) roster.push(operator);
 
   // Restore each pre-loaded CC from SEED_CCS if missing or empty. Existing counts/history are preserved.
   // The friendly name is always synced from the seed (overrides any older 'Cycle Count NNNN' boilerplate).
@@ -1118,7 +1147,6 @@ const FONT_ELEMENTS = [
   });
 
   if (activeCC && !cycleCounts[activeCC]) activeCC = '';
-  if (!operator) operator = 'Printing';
   persist();
 
   loadTheme();
@@ -1126,7 +1154,8 @@ const FONT_ELEMENTS = [
   loadFontPrefs();
   renderAll();
   updateSyncStatus();
-  openCcChooser();
+  // Ask "Who's counting?" first if no name is set on this device; otherwise go straight to the CC chooser.
+  if (!operator) { showOperatorGate(); } else { openCcChooser(); }
   // Background sync from the Pace gist — non-blocking, updates the chooser when fresh data lands.
   setTimeout(() => { syncFromGist(true); }, 200);
   // Check whether a newer app version is live (and auto-update once if so).
@@ -1145,6 +1174,7 @@ function persist() {
     localStorage.setItem('pcc_hideZeroOH',   hideZeroOH ? '1' : '0');
     localStorage.setItem('pcc_addedBins',    JSON.stringify(addedBins));
     localStorage.setItem('pcc_activeCC',     activeCC || '');
+    localStorage.setItem('pcc_roster',       JSON.stringify(roster));
     if (operator) localStorage.setItem('pcc_op', operator);
   } catch(e) {}
 }
@@ -1169,6 +1199,49 @@ function renderHeader() {
   // Count pill: GREEN when something is counted, BLUE when nothing yet.
   const cpill = document.getElementById('countPill');
   if (cpill) cpill.classList.toggle('has-counts', totals.counted > 0);
+  const opn = document.getElementById('opPillName');
+  if (opn) opn.textContent = operator || '— set name —';
+  const opl = document.getElementById('opCurrentLbl');
+  if (opl) opl.textContent = 'Counting as: ' + (operator || '(not set)');
+}
+
+// WHO'S COUNTING ────────────────────────────────────
+function showOperatorGate() {
+  renderOperatorGate();
+  document.getElementById('operatorGate').classList.remove('hidden');
+  const inp = document.getElementById('opOther');
+  if (inp) inp.value = '';
+}
+function renderOperatorGate() {
+  const list = document.getElementById('opList');
+  if (!list) return;
+  if (!roster.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:6px 0">No names yet — type yours below.</div>';
+    return;
+  }
+  list.innerHTML = roster.map(n => {
+    const safe = esc(n).replace(/'/g, "\\'");
+    const cur = (n === operator) ? ' style="border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,198,255,.18)"' : '';
+    return `<button class="op-btn" onclick="selectOperator('${safe}')"${cur}>${esc(n)}</button>`;
+  }).join('');
+}
+function selectOperator(name) {
+  name = (name || '').trim();
+  if (!name) return;
+  operator = name;
+  if (roster.indexOf(name) < 0) roster.push(name);
+  persist();
+  renderHeader();
+  document.getElementById('operatorGate').classList.add('hidden');
+  // If we still need a cycle count, send them to the chooser next.
+  if (!activeCC) openCcChooser();
+  showToast('Counting as ' + name);
+}
+function addOperatorName() {
+  const inp = document.getElementById('opOther');
+  const name = inp ? inp.value.trim() : '';
+  if (!name) { showToast('Type a name first', 'err'); return; }
+  selectOperator(name);
 }
 
 // CC CHOOSER ────────────────────────────────────────
