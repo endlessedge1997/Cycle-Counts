@@ -440,9 +440,10 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
   <div class="og-sub">PRINTING CYCLE COUNT &middot; LOT TRACKED</div>
   <div class="og-h2">Who's counting?</div>
   <div class="op-list" id="opList"></div>
-  <input type="text" id="opOther" class="op-other" placeholder="+ Type your name" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();addOperatorName();}">
+  <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:2px;margin:14px 0 6px">— OR ADD ANOTHER NAME —</div>
+  <input type="text" id="opOther" class="op-other" placeholder="Type a name (optional)" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();addOperatorName();}">
   <button class="btn btn-green" onclick="addOperatorName()" style="max-width:340px;width:100%;margin-top:10px">Add &amp; Start Counting</button>
-  <div class="og-foot">YOUR NAME IS SAVED ON THIS DEVICE &middot; IT TAGS EVERY COUNT</div>
+  <div class="og-foot">TAP YOUR NAME ABOVE &middot; IT TAGS EVERY COUNT FOR RECORD-KEEPING</div>
 </div>
 
 <!-- CC CHOOSER -->
@@ -1066,7 +1067,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-08-10-1536';
+const APP_VERSION = '2026-08-10-1543';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1093,7 +1094,10 @@ let hideZeroOH = false;    // when true, hide bins Pace shows as 0 on hand (unle
 let addedBins = {};        // addedBins[ccId][itemNum] = [{bin,lot,lotLabel,oh,uom,added:true}] — transfer/new locations
 let activeCC = '';
 let operator = '';
-let roster = [];           // list of counter names saved on THIS device for the "Who's counting?" picker
+// Master record-keeping list of counters — always shown in the "Who's counting?" picker.
+// (Record-keeping only; Pace still reports whoever is logged in for the F12 processing.)
+const ROSTER_SEED = ['Austin','Chance','Clint','Josh','Robert'];
+let roster = [];           // names shown in the picker: master list first, plus any extras typed on this device
 let pendingImport = null;
 let npCurrent = '0';
 let entryCtx = null;
@@ -1126,8 +1130,13 @@ const FONT_ELEMENTS = [
   try { countView    = (localStorage.getItem('pcc_countView') === 'bin') ? 'bin' : 'item'; } catch(e) { countView = 'item'; }
   try { activeCC     = localStorage.getItem('pcc_activeCC') || ''; } catch(e) { activeCC = ''; }
   try { operator     = localStorage.getItem('pcc_op') || ''; } catch(e) { operator = ''; }
+  // "Printing" was the old auto-default before the name picker existed — treat it as "not chosen"
+  // so returning devices get prompted to pick a real counter.
+  if (operator === 'Printing') operator = '';
   try { roster       = JSON.parse(localStorage.getItem('pcc_roster') || '[]'); } catch(e) { roster = []; }
   if (!Array.isArray(roster)) roster = [];
+  // Master list always shows first; keep any extra names typed on this device after it.
+  roster = ROSTER_SEED.concat(roster.filter(n => n && n !== 'Printing' && ROSTER_SEED.indexOf(n) < 0));
   // Make sure the current name is always in the picker list.
   if (operator && roster.indexOf(operator) < 0) roster.push(operator);
 
