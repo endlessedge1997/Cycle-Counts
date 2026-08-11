@@ -460,6 +460,20 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 .bin-loc,.bin-lot,.bin-oh,.bin-status{font-family:var(--sans)}
 /* CSV/data boxes keep a real monospace for column-ish reading */
 #importBody,.import-preview pre{font-family:var(--code);font-size:12px}
+
+/* ═══ SEND-TO-MANAGER card (Export tab) — the primary, most-used control ═══ */
+.send-card{border:2px solid var(--accent);background:var(--surface);padding:16px 15px}
+.send-title{font-family:var(--head);font-weight:700;font-size:21px;letter-spacing:.5px;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.send-summary{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;margin-bottom:14px}
+.send-big{font-family:var(--head);font-weight:700;font-size:19px;color:var(--text);line-height:1.2}
+.send-sub{font-family:var(--sans);font-size:14px;color:var(--muted);margin-top:4px}
+.send-list{font-family:var(--sans);font-size:13.5px;color:var(--text);margin-top:9px;line-height:1.55}
+.send-warn{font-family:var(--sans);font-size:13.5px;color:var(--gold);font-weight:600;line-height:1.5}
+.send-note{font-family:var(--sans);font-size:13px;color:var(--muted);line-height:1.5;margin:11px 2px}
+.send-card .btn-xl{font-size:16px;padding:16px;letter-spacing:.5px;margin-top:10px}
+.send-extra{display:flex;gap:8px;margin-top:14px;padding-top:13px;border-top:1px solid var(--border)}
+.send-extra .btn{margin-top:0;flex:1;font-size:12px;padding:10px 8px}
+.card-secondary{opacity:.92}
 </style>
 </head>
 <body>
@@ -557,33 +571,21 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <!-- EXPORT TAB -->
 <div class="page" id="page-export">
-  <div class="card" style="border-color:var(--accent)">
-    <div class="card-title" style="color:var(--accent)">Send Current Counts to Manager</div>
-    <div style="font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.7;margin-bottom:10px" id="exportSummary">—</div>
-    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
-      Tap <strong style="color:var(--text)">Copy Current CSV</strong>, then open your email app, start a message to the manager, and <strong style="color:var(--text)">paste</strong> into the body. Send it. (This text is what the manager pastes into Pace — don't send a file attachment.)
-    </p>
-    <button class="btn btn-primary" onclick="copyCSV('current')">📋 Copy Current CSV (then paste into email)</button>
-    <button class="btn btn-green" style="margin-top:8px" onclick="printCurrent()">🖨 Print Current Counts</button>
-    <button class="btn btn-ghost" style="margin-top:8px" onclick="downloadCSV('current')">⬇ Download as CSV file (backup)</button>
+  <!-- SEND TO MANAGER — the main tool; used most, kept big & clear. Send, then Finalize, in one place. -->
+  <div class="card send-card">
+    <div class="send-title">📤 Send to Manager</div>
+    <div id="sendCardBody"></div>
   </div>
 
-  <div class="card">
-    <div class="card-title">History</div>
+  <!-- HISTORY & backups — secondary, visually de-emphasized so it reads differently from Send -->
+  <div class="card card-secondary">
+    <div class="card-title" style="font-size:13px;color:var(--muted)">🕓 History &amp; backups</div>
     <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
-      All historical counts — applies the current search/filter from the History tab.
+      All past counts (uses the search/filter from the History tab). For your reference — not the manager hand-off.
     </p>
-    <button class="btn btn-primary" onclick="copyCSV('history')">📋 Copy History CSV</button>
-    <button class="btn btn-green" style="margin-top:8px" onclick="printHistory()">🖨 Print History</button>
-    <button class="btn btn-ghost" style="margin-top:8px" onclick="downloadCSV('history')">⬇ Download History as CSV file</button>
-  </div>
-
-  <div class="card" style="border-color:var(--gold)">
-    <div class="card-title" style="color:var(--gold)">Finalize Cycle Count</div>
-    <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
-      Marks the current cycle count as complete. All counts are kept in History. The cycle count remains available — operators can re-open it for a follow-up pass, but it's flagged as finalized for reporting.
-    </p>
-    <button class="btn btn-gold" onclick="finalizeCC()">✔ Finalize Current Cycle Count</button>
+    <button class="btn btn-ghost" onclick="copyCSV('history')">📋 Copy History CSV</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="printHistory()">🖨 Print History</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="downloadCSV('history')">⬇ Download History CSV</button>
   </div>
 
   <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px;font-size:10px;color:var(--muted);line-height:1.6">
@@ -1097,7 +1099,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-08-11-0800';
+const APP_VERSION = '2026-08-11-0834';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3411,21 +3413,89 @@ function clearAllHistory() {
 }
 
 // EXPORT TAB ────────────────────────────────────────
+// Finalize EVERY counted Asset-Management CC at once (used after "send all asset counts").
+function finalizeAllAssets() {
+  const ids = assetCcIdsWithCounts();
+  if (!ids.length) { showToast('No asset counts to finalize','err'); return; }
+  const names = ids.map(id => (cycleCounts[id] && cycleCounts[id].name) ? cycleCounts[id].name : id);
+  if (!confirm('Finalize ' + ids.length + ' Asset Management cycle count(s)?\n\n' + names.join(', ') +
+               '\n\nThis clears their current counts for a fresh pass (History is kept). Make sure you already sent them to the manager.')) return;
+  ids.forEach(id => {
+    cycleCounts[id].finalizedAt = Date.now();
+    cycleCounts[id].finalizedBy = operator || '';
+    counts[id] = [];
+  });
+  persist();
+  renderAll();
+  renderExportSummary();
+  showToast('Finalized ' + ids.length + ' asset counts — reset for next pass');
+}
 function renderExportSummary() {
+  const el = document.getElementById('sendCardBody');
+  if (!el) return;
   const cc = cycleCounts[activeCC];
-  if (!cc) { document.getElementById('exportSummary').textContent = 'No active cycle count'; return; }
+  if (!cc) { el.innerHTML = '<div class="send-warn">No active cycle count — pick one from the CC chooser first.</div>'; return; }
+  const isAsset = groupOf(activeCC) === 'Asset Management';
   const totals = activeCCTotals();
-  const finalized = cc.finalizedAt ? ' · finalized ' + new Date(cc.finalizedAt).toLocaleDateString('en-US') : '';
-  document.getElementById('exportSummary').innerHTML =
-    'CC <strong style="color:var(--accent)">' + esc(cc.id) + '</strong><br>' +
-    Object.keys(cc.items).length + ' items · ' + totals.total + ' bin locations<br>' +
-    totals.counted + ' counted (' + (totals.total ? Math.round(totals.counted/totals.total*100) : 0) + '%)' +
-    finalized;
+  let html = '';
+  if (isAsset) {
+    const ids = assetCcIdsWithCounts();
+    const names = ids.map(id => (cycleCounts[id] && cycleCounts[id].name) ? cycleCounts[id].name : id);
+    const totalRows = ids.reduce((n, id) => n + (counts[id] || []).length, 0);
+    html +=
+      '<div class="send-summary">' +
+        '<div class="send-big">Asset Management — send all</div>' +
+        '<div class="send-sub">' + ids.length + ' cycle count' + (ids.length === 1 ? '' : 's') + ' counted · ' + totalRows + ' rows total</div>' +
+        (ids.length
+          ? '<div class="send-list">' + names.map(esc).join(' &nbsp;·&nbsp; ') + '</div>'
+          : '<div class="send-warn">Nothing counted yet. Count some asset cycle counts, then come back here to send them all.</div>') +
+      '</div>';
+    html += '<button class="btn btn-primary btn-xl" onclick="copyCSV(\'assets\')">📋 Copy ALL Asset Counts</button>';
+    html += '<p class="send-note">Copies <strong>every Asset Management count you\'ve done</strong> in one go. Open your email, paste into a message to the manager, and send. (The manager pastes it into each asset count in Pace.)</p>';
+    html += '<button class="btn btn-gold btn-xl" onclick="finalizeAllAssets()">✔ Finalize all sent asset counts</button>';
+    html += '<div class="send-extra">' +
+      '<button class="btn btn-ghost" onclick="downloadCSV(\'assets\')">⬇ Backup CSV</button>' +
+      '<button class="btn btn-ghost" onclick="copyCSV(\'current\')">📋 Just this one</button>' +
+      '</div>';
+  } else {
+    const finalized = cc.finalizedAt ? ' · finalized ' + new Date(cc.finalizedAt).toLocaleDateString('en-US') : '';
+    html +=
+      '<div class="send-summary">' +
+        '<div class="send-big">CC ' + esc(cc.id) + (cc.name ? ' · ' + esc(cc.name) : '') + '</div>' +
+        '<div class="send-sub">' + totals.counted + ' of ' + totals.total + ' counted (' +
+          (totals.total ? Math.round(totals.counted / totals.total * 100) : 0) + '%)' + finalized + '</div>' +
+      '</div>';
+    html += '<button class="btn btn-primary btn-xl" onclick="copyCSV(\'current\')">📋 Copy This Count</button>';
+    html += '<p class="send-note">Open your email, paste into a message to the manager, and send. The manager pastes it into Pace.</p>';
+    html += '<button class="btn btn-gold btn-xl" onclick="finalizeAndClear()">✔ Finalize this cycle count</button>';
+    html += '<div class="send-extra">' +
+      '<button class="btn btn-ghost" onclick="printCurrent()">🖨 Print</button>' +
+      '<button class="btn btn-ghost" onclick="downloadCSV(\'current\')">⬇ Backup CSV</button>' +
+      '</div>';
+  }
+  el.innerHTML = html;
 }
 
+// Asset-Management cycle counts that currently have counts logged (for the "send all" flow).
+function assetCcIdsWithCounts() {
+  return Object.keys(counts)
+    .filter(id => (counts[id] || []).length && groupOf(id) === 'Asset Management')
+    .sort((a, b) => String(cycleCounts[a] && cycleCounts[a].name || a)
+      .localeCompare(String(cycleCounts[b] && cycleCounts[b].name || b), undefined, { numeric: true }));
+}
+// Rows to export for a given scope: 'history', 'assets' (all counted asset CCs combined), or current CC.
+function rowsForScope(scope) {
+  if (scope === 'history') return filteredHistoryForExport();
+  if (scope === 'assets') {
+    const out = [];
+    assetCcIdsWithCounts().forEach(id => (counts[id] || []).forEach(c => out.push(c)));
+    return out;
+  }
+  return counts[activeCC] || [];
+}
 function buildCSV(scope) {
   const header = '"Cycle Count","Item Number","Description","Bin","Lot ID","Lot Label","On Hand","UOM","Count Qty","Variance","Bin Change","Date","Time","By"';
-  const rows = (scope === 'history' ? filteredHistoryForExport() : (counts[activeCC] || [])).map(c => [
+  const rows = rowsForScope(scope).map(c => [
     '"'+(c.ccId||activeCC)+'"',
     '"'+c.itemNum+'"',
     '"'+String(c.desc||'').replace(/"/g,'""')+'"',
@@ -3457,27 +3527,34 @@ function filteredHistoryForExport() {
   return filtered;
 }
 
+function scopeFileTag(scope) {
+  if (scope === 'history') return 'history';
+  if (scope === 'assets') return 'asset_management_all';
+  return activeCC;
+}
 function downloadCSV(scope) {
-  const rows = scope === 'history' ? filteredHistoryForExport() : (counts[activeCC] || []);
+  const rows = rowsForScope(scope);
   if (!rows.length) { showToast('Nothing to download','err'); return; }
   const blob = new Blob([buildCSV(scope)], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = (scope === 'history' ? 'cycle_count_history_' : 'cycle_count_' + activeCC + '_') +
-    new Date().toISOString().slice(0,10) + '.csv';
+  a.download = 'cycle_count_' + scopeFileTag(scope) + '_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
   showToast('CSV downloaded');
 }
 function copyCSV(scope) {
-  const rows = scope === 'history' ? filteredHistoryForExport() : (counts[activeCC] || []);
-  if (!rows.length) { showToast('Nothing to copy','err'); return; }
+  const rows = rowsForScope(scope);
+  if (!rows.length) { showToast(scope === 'assets' ? 'No asset counts yet' : 'Nothing to copy','err'); return; }
   // Robust copy (async clipboard with a textarea/execCommand fallback for iOS Safari quirks).
-  copyTextToClipboard(buildCSV(scope), 'CSV copied — paste it into your email');
+  const msg = scope === 'assets'
+    ? ('Copied ' + rows.length + ' rows from ' + assetCcIdsWithCounts().length + ' asset counts — paste into your email')
+    : 'CSV copied — paste it into your email';
+  copyTextToClipboard(buildCSV(scope), msg);
 }
 async function emailReport(scope) {
   const email = document.getElementById('emailAddr').value.trim();
   if (!email) { showToast('Enter email address','err'); return; }
-  const rows = scope === 'history' ? filteredHistoryForExport() : (counts[activeCC] || []);
+  const rows = rowsForScope(scope);
   if (!rows.length) { showToast('Nothing to email','err'); return; }
   const csv = buildCSV(scope);
   const fname = (scope === 'history' ? 'cycle_count_history_' : 'cycle_count_' + activeCC + '_') +
