@@ -506,6 +506,17 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 .send-extra{display:flex;gap:8px;margin-top:14px;padding-top:13px;border-top:1px solid var(--border)}
 .send-extra .btn{margin-top:0;flex:1;font-size:12px;padding:10px 8px}
 .card-secondary{opacity:.92}
+/* Selectable counts list in Send-to-Manager */
+.send-sel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-family:var(--head);font-weight:700;font-size:14px;letter-spacing:.5px;color:var(--text)}
+.send-sel-actions button{font-family:var(--sans);font-size:11px;font-weight:700;padding:4px 10px;margin-left:6px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--text);cursor:pointer}
+.send-sel-list{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;max-height:44vh;overflow-y:auto}
+.send-sel-row{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);cursor:pointer}
+.send-sel-row.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,198,255,.15)}
+.send-sel-row input[type=checkbox]{width:22px;height:22px;flex-shrink:0;accent-color:var(--accent2)}
+.send-sel-row .ssr-main{display:flex;flex-direction:column;min-width:0}
+.send-sel-row .ssr-name{font-family:var(--sans);font-weight:700;font-size:14.5px;color:var(--text);line-height:1.2}
+.send-sel-row .ssr-sub{font-family:var(--sans);font-size:12px;color:var(--muted);margin-top:2px}
+.send-sel-row .ssr-partial{color:var(--gold)}
 </style>
 </head>
 <body>
@@ -1132,7 +1143,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-08-11-1212';
+const APP_VERSION = '2026-08-11-1449';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1173,6 +1184,8 @@ const DEPT_EMAIL = {
   'Asset Management': 'robert@endlessedge.com',
 };
 let checklistOpen = null;  // null = auto (open when month-end is near AND work is outstanding)
+let exportSel = new Set(); // ccIds checked on the Export "Send to Manager" screen
+let exportSelInit = false;  // have we applied the default selection (all complete counts) yet?
 let pendingImport = null;
 let npCurrent = '0';
 let entryCtx = null;
@@ -3544,6 +3557,8 @@ function finalizeAndClear() {
   cc.finalizedAt = Date.now();
   cc.finalizedBy = operator || '';
   counts[activeCC] = [];
+  delete notes[activeCC];
+  exportSel.delete(activeCC);
   persist();
   renderAll();
   renderCountedList();  // refresh the open popup (list empties, last-finalized updates)
@@ -3589,56 +3604,150 @@ function finalizeAllAssets() {
     cycleCounts[id].finalizedAt = Date.now();
     cycleCounts[id].finalizedBy = operator || '';
     counts[id] = [];
+    delete notes[id];
+    exportSel.delete(id);
   });
   persist();
   renderAll();
   renderExportSummary();
   showToast('Finalized ' + ids.length + ' asset counts — reset for next pass');
 }
+// Counted/total for ANY cycle count (mirrors activeCCTotals but for a given id).
+function ccTotals(id) {
+  const cc = cycleCounts[id];
+  if (!cc) return { counted: 0, total: 0 };
+  let total = 0;
+  Object.entries(cc.items || {}).forEach(([num, it]) => total += visibleBins(num, it, id).length);
+  const counted = (counts[id] || []).filter(c => !isBinHidden(c.bin)).length;
+  return { counted, total };
+}
+function exportIsComplete(id) { const t = ccTotals(id); return t.total > 0 && t.counted >= t.total; }
+function notesCountFor(id) {
+  const nn = notes[id]; if (!nn) return 0;
+  return Object.keys(nn).filter(k => nn[k] && String(nn[k]).trim()).length;
+}
+// Cycle counts that currently have counts logged and are NOT finalized — candidates to send.
+function candidateExportCCs() {
+  return Object.keys(counts)
+    .filter(id => (counts[id] || []).length > 0 && cycleCounts[id] && !cycleCounts[id].finalizedAt)
+    .sort((a, b) => {
+      const ga = DEPT_ORDER.indexOf(groupOf(a)), gb = DEPT_ORDER.indexOf(groupOf(b));
+      if (ga !== gb) return (ga < 0 ? 99 : ga) - (gb < 0 ? 99 : gb);
+      return String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true });
+    });
+}
+function selectedExportIds() { return candidateExportCCs().filter(id => exportSel.has(id)); }
+function toggleExportSel(id) {
+  if (exportSel.has(id)) exportSel.delete(id); else exportSel.add(id);
+  renderExportSummary();
+}
+function selectAllExport(on) {
+  const cands = candidateExportCCs();
+  if (on) cands.forEach(id => exportSel.add(id)); else exportSel.clear();
+  renderExportSummary();
+}
 function renderExportSummary() {
   const el = document.getElementById('sendCardBody');
   if (!el) return;
-  const cc = cycleCounts[activeCC];
-  if (!cc) { el.innerHTML = '<div class="send-warn">No active cycle count — pick one from the CC chooser first.</div>'; return; }
-  const isAsset = groupOf(activeCC) === 'Asset Management';
-  const totals = activeCCTotals();
-  let html = '';
-  if (isAsset) {
-    const ids = assetCcIdsWithCounts();
-    const names = ids.map(id => (cycleCounts[id] && cycleCounts[id].name) ? cycleCounts[id].name : id);
-    const totalRows = ids.reduce((n, id) => n + (counts[id] || []).length, 0);
-    html +=
-      '<div class="send-summary">' +
-        '<div class="send-big">Asset Management — send all</div>' +
-        '<div class="send-sub">' + ids.length + ' cycle count' + (ids.length === 1 ? '' : 's') + ' counted · ' + totalRows + ' rows total</div>' +
-        (ids.length
-          ? '<div class="send-list">' + names.map(esc).join(' &nbsp;·&nbsp; ') + '</div>'
-          : '<div class="send-warn">Nothing counted yet. Count some asset cycle counts, then come back here to send them all.</div>') +
-      '</div>';
-    html += '<button class="btn btn-primary btn-xl" onclick="copyCSV(\'assets\')">📋 Copy ALL Asset Counts</button>';
-    html += '<p class="send-note">Copies <strong>every Asset Management count you\'ve done</strong> in one go. Open your email, paste into a message to the manager, and send. (The manager pastes it into each asset count in Pace.)</p>';
-    html += '<button class="btn btn-gold btn-xl" onclick="finalizeAllAssets()">✔ Finalize all sent asset counts</button>';
-    html += '<div class="send-extra">' +
-      '<button class="btn btn-ghost" onclick="downloadCSV(\'assets\')">⬇ Backup CSV</button>' +
-      '<button class="btn btn-ghost" onclick="copyCSV(\'current\')">📋 Just this one</button>' +
-      '</div>';
-  } else {
-    const finalized = cc.finalizedAt ? ' · finalized ' + new Date(cc.finalizedAt).toLocaleDateString('en-US') : '';
-    html +=
-      '<div class="send-summary">' +
-        '<div class="send-big">CC ' + esc(cc.id) + (cc.name ? ' · ' + esc(cc.name) : '') + '</div>' +
-        '<div class="send-sub">' + totals.counted + ' of ' + totals.total + ' counted (' +
-          (totals.total ? Math.round(totals.counted / totals.total * 100) : 0) + '%)' + finalized + '</div>' +
-      '</div>';
-    html += '<button class="btn btn-primary btn-xl" onclick="copyCSV(\'current\')">📋 Copy This Count</button>';
-    html += '<p class="send-note">Open your email, paste into a message to the manager, and send. The manager pastes it into Pace.</p>';
-    html += '<button class="btn btn-gold btn-xl" onclick="finalizeAndClear()">✔ Finalize this cycle count</button>';
-    html += '<div class="send-extra">' +
-      '<button class="btn btn-ghost" onclick="printCurrent()">🖨 Print</button>' +
-      '<button class="btn btn-ghost" onclick="downloadCSV(\'current\')">⬇ Backup CSV</button>' +
-      '</div>';
+  const cands = candidateExportCCs();
+  // First time we have candidates, pre-check the COMPLETE ones (partials stay unchecked).
+  if (!exportSelInit && cands.length) {
+    cands.forEach(id => { if (exportIsComplete(id)) exportSel.add(id); });
+    exportSelInit = true;
   }
+  Array.from(exportSel).forEach(id => { if (cands.indexOf(id) < 0) exportSel.delete(id); }); // prune stale
+  if (!cands.length) {
+    el.innerHTML = '<div class="send-warn">Nothing counted yet. Count some items, then come back here to send them to the manager.</div>';
+    return;
+  }
+  const selIds = selectedExportIds();
+  const selRows = selIds.reduce((n, id) => n + (counts[id] || []).length, 0);
+  const selNotes = selIds.reduce((n, id) => n + notesCountFor(id), 0);
+  let html = '<div class="send-sel-head"><span>Select counts to send</span>' +
+    '<span class="send-sel-actions"><button onclick="selectAllExport(true)">All</button>' +
+    '<button onclick="selectAllExport(false)">None</button></span></div>';
+  html += '<div class="send-sel-list">';
+  cands.forEach(id => {
+    const cc = cycleCounts[id];
+    const t = ccTotals(id);
+    const complete = t.total > 0 && t.counted >= t.total;
+    const checked = exportSel.has(id);
+    const noteN = notesCountFor(id);
+    const escId = esc(id).replace(/'/g, "\\'");
+    html += '<label class="send-sel-row' + (checked ? ' on' : '') + '">' +
+      '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="toggleExportSel(\'' + escId + '\')">' +
+      '<span class="ssr-main"><span class="ssr-name">' + esc(cc.name || id) + '</span>' +
+      '<span class="ssr-sub">' + esc(groupOf(id)) + ' &middot; ' + t.counted + '/' + t.total + ' counted' +
+        (complete ? '' : ' &middot; <b class="ssr-partial">PARTIAL</b>') +
+        (noteN ? (' &middot; 📝 ' + noteN + ' note' + (noteN === 1 ? '' : 's')) : '') +
+      '</span></span></label>';
+  });
+  html += '</div>';
+  html += '<button class="btn btn-primary btn-xl" onclick="copySelected()">📋 Copy ' + selIds.length +
+    ' Selected Count' + (selIds.length === 1 ? '' : 's') + '</button>';
+  html += '<p class="send-note">Copies <strong>only the ' + selIds.length + ' checked count' + (selIds.length === 1 ? '' : 's') +
+    '</strong> above — partial counts are left out unless you check them. ' +
+    'Any <strong>item notes</strong> you added are pasted into the email <strong>under the CSV</strong>' +
+    (selNotes ? ' (' + selNotes + ' note' + (selNotes === 1 ? '' : 's') + ' will be included)' : '') +
+    '. Notes are <strong>cleared when you finalize</strong>.</p>';
+  html += '<button class="btn btn-green btn-xl" onclick="printVarianceSelected()">🖨 Print Variance Report (review first)</button>';
+  html += '<button class="btn btn-gold btn-xl" onclick="finalizeSelected()">✔ Finalize Selected &amp; Clear</button>';
+  html += '<div class="send-extra"><button class="btn btn-ghost" onclick="downloadSelected()">⬇ Backup CSV</button></div>';
   el.innerHTML = html;
+}
+// Build the "NOTES" block that rides under the CSV in the email body.
+function notesBlockFor(ids) {
+  const lines = [];
+  ids.forEach(id => {
+    const nn = notes[id]; if (!nn) return;
+    const keys = Object.keys(nn).filter(k => nn[k] && String(nn[k]).trim());
+    if (!keys.length) return;
+    const cc = cycleCounts[id];
+    lines.push('CC ' + id + (cc && cc.name ? ' — ' + cc.name : '') + ':');
+    keys.forEach(k => {
+      const desc = (cc && cc.items[k]) ? cc.items[k].desc : '';
+      lines.push('  • Item ' + k + (desc ? ' (' + desc + ')' : '') + ': ' + String(nn[k]).trim());
+    });
+  });
+  return lines.length ? ('\n\n───────── NOTES FROM COUNTER ─────────\n' + lines.join('\n')) : '';
+}
+function copySelected() {
+  const ids = selectedExportIds();
+  if (!ids.length) { showToast('Check at least one count to copy', 'err'); return; }
+  const rows = rowsForIds(ids);
+  if (!rows.length) { showToast('Selected counts have no rows', 'err'); return; }
+  const text = buildCSVFromRows(rows) + notesBlockFor(ids);
+  const noteN = ids.reduce((n, id) => n + notesCountFor(id), 0);
+  copyTextToClipboard(text, 'Copied ' + rows.length + ' rows' + (ids.length > 1 ? ' from ' + ids.length + ' counts' : '') +
+    (noteN ? ' + ' + noteN + ' note' + (noteN === 1 ? '' : 's') : '') + ' — paste into your email');
+}
+function downloadSelected() {
+  const ids = selectedExportIds();
+  if (!ids.length) { showToast('Check at least one count first', 'err'); return; }
+  const blob = new Blob([buildCSVFromRows(rowsForIds(ids)) + notesBlockFor(ids)], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'cycle_count_selected_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  showToast('CSV downloaded');
+}
+function finalizeSelected() {
+  const ids = selectedExportIds();
+  if (!ids.length) { showToast('Check at least one count to finalize', 'err'); return; }
+  const names = ids.map(id => (cycleCounts[id] && cycleCounts[id].name) ? cycleCounts[id].name : id);
+  if (!confirm('Finalize ' + ids.length + ' selected cycle count(s)?\n\n' + names.join(', ') +
+    '\n\nThis clears their counts AND their item notes for a fresh pass (History is kept). Make sure you already sent them to the manager.')) return;
+  ids.forEach(id => {
+    cycleCounts[id].finalizedAt = Date.now();
+    cycleCounts[id].finalizedBy = operator || '';
+    counts[id] = [];
+    delete notes[id];
+    exportSel.delete(id);
+  });
+  persist();
+  renderAll();
+  renderExportSummary();
+  showToast('Finalized ' + ids.length + ' count' + (ids.length === 1 ? '' : 's') + ' — notes cleared, reset for next pass');
 }
 
 // Asset-Management cycle counts that currently have counts logged (for the "send all" flow).
@@ -3658,9 +3767,15 @@ function rowsForScope(scope) {
   }
   return counts[activeCC] || [];
 }
-function buildCSV(scope) {
+// Combine the count rows for a specific set of cycle-count ids (used by the selectable export).
+function rowsForIds(ids) {
+  const out = [];
+  ids.forEach(id => (counts[id] || []).forEach(c => out.push(c)));
+  return out;
+}
+function buildCSVFromRows(rowObjs) {
   const header = '"Cycle Count","Item Number","Description","Bin","Lot ID","Lot Label","On Hand","UOM","Count Qty","Variance","Bin Change","Date","Time","By"';
-  const rows = rowsForScope(scope).map(c => [
+  const rows = rowObjs.map(c => [
     '"'+(c.ccId||activeCC)+'"',
     '"'+c.itemNum+'"',
     '"'+String(c.desc||'').replace(/"/g,'""')+'"',
@@ -3678,6 +3793,7 @@ function buildCSV(scope) {
   ].join(','));
   return header + '\n' + rows.join('\n');
 }
+function buildCSV(scope) { return buildCSVFromRows(rowsForScope(scope)); }
 
 function filteredHistoryForExport() {
   const q = document.getElementById('histSearch').value.trim().toLowerCase();
@@ -3961,6 +4077,76 @@ function printVarianceReport() {
   win.document.open();
   win.document.write(html);
   win.document.close();
+  setTimeout(() => { try { win.focus(); win.print(); } catch(e){} }, 300);
+}
+
+// Variance report built from the app's OWN count data for the CHECKED counts — for the
+// counter to review/investigate before sending. One section per cycle count, with notes.
+function printVarianceSelected() {
+  const ids = selectedExportIds();
+  if (!ids.length) { showToast('Check at least one count to review', 'err'); return; }
+  const fnum = n => { const v = Math.round(n * 1000) / 1000; return Number.isInteger(v) ? v.toString() : v.toFixed(3).replace(/0+$/,'').replace(/\.$/,''); };
+  let sections = '', gRows = 0, gVarRows = 0, gVar = 0;
+  ids.forEach(id => {
+    const cc = cycleCounts[id];
+    const src = (counts[id] || []).filter(c => !isBinHidden(c.bin));
+    if (!src.length) return;
+    const data = src.map(c => ({ item: c.itemNum, desc: c.desc || '', bin: c.bin || '', lot: c.lotLabel || c.lot || '', oh: c.oh || 0, qty: c.countQty || 0, variance: (c.countQty || 0) - (c.oh || 0) }));
+    data.sort((a, b) => { const cmp = a.bin.localeCompare(b.bin, undefined, { numeric: true }); if (cmp) return cmp; const an = parseInt(a.item, 10), bn = parseInt(b.item, 10); if (!isNaN(an) && !isNaN(bn) && an !== bn) return an - bn; return a.item.localeCompare(b.item); });
+    const varRows = data.filter(d => Math.abs(d.variance) > 0.0001).length;
+    const tOh = data.reduce((a, d) => a + d.oh, 0), tQty = data.reduce((a, d) => a + d.qty, 0), tVar = tQty - tOh;
+    gRows += data.length; gVarRows += varRows; gVar += tVar;
+    const body = data.map(d => {
+      const vneg = d.variance < -0.0001, vpos = d.variance > 0.0001;
+      const vcol = vneg ? 'color:#c00;font-weight:bold' : vpos ? 'color:#0a7;font-weight:bold' : 'color:#888';
+      return '<tr><td>' + esc(d.item) + '</td><td class="desc">' + esc(d.desc) + '</td><td>' + esc(d.bin) + '</td><td>' + esc(d.lot) + '</td>' +
+        '<td class="num">' + fnum(d.oh) + '</td><td class="num">' + fnum(d.qty) + '</td>' +
+        '<td class="num" style="' + vcol + '">' + (d.variance > 0 ? '+' : '') + fnum(d.variance) + '</td></tr>';
+    }).join('');
+    let notesHtml = '';
+    const nn = notes[id];
+    if (nn) {
+      const keys = Object.keys(nn).filter(k => nn[k] && String(nn[k]).trim());
+      if (keys.length) notesHtml = '<div class="notes"><b>Notes to investigate:</b><ul>' +
+        keys.map(k => { const desc = (cc && cc.items[k]) ? cc.items[k].desc : ''; return '<li>#' + esc(k) + (desc ? ' (' + esc(desc) + ')' : '') + ': ' + esc(String(nn[k]).trim()) + '</li>'; }).join('') + '</ul></div>';
+    }
+    sections += '<div class="section"><h2>CC ' + esc(id) + (cc && cc.name ? ' — ' + esc(cc.name) : '') + '</h2>' +
+      '<div class="smeta">' + esc(groupOf(id)) + ' &middot; ' + data.length + ' rows &middot; ' + varRows + ' with variance</div>' +
+      '<table><thead><tr><th>Item #</th><th>Description</th><th>Bin / Location</th><th>Lot</th>' +
+      '<th style="text-align:right">System On-Hand</th><th style="text-align:right">Counted</th><th style="text-align:right">Variance</th></tr></thead><tbody>' + body + '</tbody>' +
+      '<tfoot><tr><td colspan="4">TOTALS</td><td class="num">' + fnum(tOh) + '</td><td class="num">' + fnum(tQty) + '</td>' +
+      '<td class="num" style="' + (tVar < 0 ? 'color:#c00' : tVar > 0 ? 'color:#0a7' : '') + '">' + (tVar > 0 ? '+' : '') + fnum(tVar) + '</td></tr></tfoot></table>' +
+      notesHtml + '</div>';
+  });
+  if (!sections) { showToast('Selected counts have no rows', 'err'); return; }
+  const css =
+    '@page{margin:12mm 10mm;size:portrait}' +
+    '*{box-sizing:border-box;margin:0;padding:0}' +
+    'body{font-family:Arial,sans-serif;color:#000;font-size:9pt;padding-bottom:20px}' +
+    '.hd{border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px}' +
+    '.hd h1{font-size:15pt;margin-bottom:2px}.hd .meta{font-size:8.5pt;color:#555;margin-top:3px}' +
+    '.section{margin-top:14px;page-break-inside:avoid}' +
+    '.section h2{font-size:11.5pt;margin-bottom:1px}.section .smeta{font-size:8.5pt;color:#555;margin-bottom:4px}' +
+    'table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-top:4px}' +
+    'th{background:#0072ff;color:#fff;text-align:left;padding:4px 6px;border:1px solid #0060dd;font-size:8pt;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    'td{padding:3px 6px;border-bottom:1px solid #ddd;vertical-align:top}' +
+    'tr:nth-child(even) td{background:#f2f6ff;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    '.num{text-align:right;white-space:nowrap}.desc{word-break:break-word}' +
+    'tfoot td{border-top:2px solid #000;font-weight:bold;background:#fff}' +
+    '.notes{margin-top:5px;font-size:8.5pt;background:#fff8e1;border:1px solid #f0c14b;border-radius:4px;padding:6px 8px;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    '.notes ul{margin:3px 0 0 16px}' +
+    '.toolbar{position:fixed;top:8px;right:8px;background:#0072ff;color:#fff;padding:8px 12px;border-radius:6px;font-size:11px}' +
+    '.toolbar button{background:#fff;color:#0072ff;border:none;padding:5px 12px;border-radius:4px;font-weight:bold;margin-left:6px;cursor:pointer}' +
+    '@media print{.toolbar{display:none}}';
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Variance Review — Endless Edge</title><style>' + css + '</style></head><body>' +
+    '<div class="toolbar">Variance Review <button onclick="window.print()">Print</button></div>' +
+    '<div class="hd"><h1>Cycle Count Variance — Review</h1>' +
+    '<div class="meta">Counter: ' + esc(operator || '—') + ' &middot; ' + ids.length + ' cycle count' + (ids.length === 1 ? '' : 's') +
+    ' &middot; ' + gRows + ' rows &middot; ' + gVarRows + ' with variance &middot; Printed ' + new Date().toLocaleString() +
+    ' &middot; <b>NOT YET SENT / NOT FINALIZED</b></div></div>' + sections + '</body></html>';
+  const win = window.open('', '_blank', 'width=900,height=1100');
+  if (!win) { showToast('Popup blocked — allow popups, then retry', 'err'); return; }
+  win.document.open(); win.document.write(html); win.document.close();
   setTimeout(() => { try { win.focus(); win.print(); } catch(e){} }, 300);
 }
 
