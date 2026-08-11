@@ -461,6 +461,38 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 /* CSV/data boxes keep a real monospace for column-ish reading */
 #importBody,.import-preview pre{font-family:var(--code);font-size:12px}
 
+/* ═══ MONTH-END CHECKLIST (chooser) — status via background tints so it survives light-mode's forced-black text ═══ */
+.mchk{width:100%;max-width:480px;margin:0 auto 16px}
+.mchk-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 15px;border-radius:12px;cursor:pointer;border:1px solid var(--border);background:var(--surface2)}
+.mchk-head.mchk-amber{background:rgba(245,166,35,.20);border-color:var(--gold)}
+.mchk-head.mchk-red{background:rgba(255,77,77,.20);border-color:var(--red)}
+.mchk-head.mchk-ok{background:rgba(39,201,122,.16);border-color:var(--green)}
+.mchk-title{font-family:var(--head);font-weight:700;font-size:16px;letter-spacing:.5px;color:var(--text)}
+.mchk-sub{font-family:var(--sans);font-size:12.5px;color:var(--muted);margin-top:2px}
+.mchk-chev{font-size:14px;color:var(--muted)}
+.mchk-body{margin-top:10px;display:flex;flex-direction:column;gap:12px}
+.mchk-banner{font-family:var(--sans);font-weight:700;font-size:13.5px;padding:10px 12px;border-radius:8px;text-align:center;line-height:1.35}
+.mchk-banner.mchk-red{background:rgba(255,77,77,.22)}
+.mchk-banner.mchk-amber{background:rgba(245,166,35,.24)}
+.mchk-banner.mchk-ok{background:rgba(39,201,122,.20)}
+.mchk-dept{border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.mchk-dept-head{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--surface2)}
+.mchk-dept-name{font-family:var(--head);font-weight:700;font-size:14px;letter-spacing:.5px;flex:1;color:var(--text)}
+.mchk-dept-prog{font-family:var(--sans);font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--surface)}
+.mchk-dept-prog.mchk-ok{background:rgba(39,201,122,.28)}
+.mchk-dept-prog.mchk-amber{background:rgba(245,166,35,.30)}
+.mchk-dept-prog.mchk-red{background:rgba(255,77,77,.30)}
+.mchk-remind{font-family:var(--sans);font-size:11px;font-weight:700;padding:6px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;color:var(--text)}
+.mchk-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border-top:1px solid var(--border);cursor:pointer}
+.mchk-row.todo{background:rgba(255,77,77,.07)}
+.mchk-ck{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;flex-shrink:0}
+.mchk-row.done .mchk-ck{background:var(--green);color:#fff}
+.mchk-row.todo .mchk-ck{border:2px dashed var(--red);box-sizing:border-box;background:transparent}
+.mchk-name{flex:1;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--text);line-height:1.2}
+.mchk-meta{font-family:var(--sans);font-size:11.5px;color:var(--muted);text-align:right;white-space:nowrap}
+.mchk-todo-txt{color:var(--red);font-weight:700}
+.mchk-remind1{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:13px;cursor:pointer;flex-shrink:0}
+
 /* ═══ SEND-TO-MANAGER card (Export tab) — the primary, most-used control ═══ */
 .send-card{border:2px solid var(--accent);background:var(--surface);padding:16px 15px}
 .send-title{font-family:var(--head);font-weight:700;font-size:21px;letter-spacing:.5px;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
@@ -496,6 +528,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
   <div class="ccc-logo">Endless Edge</div>
   <div class="ccc-sub">PRINTING CYCLE COUNT &middot; LOT TRACKED</div>
   <div class="ccc-h2">Select a Cycle Count</div>
+  <div id="monthChecklist" class="mchk"></div>
   <div class="ccc-list" id="ccChooserList"></div>
   <div class="ccc-foot">TAP A CARD TO START &middot; PROGRESS IS SAVED PER CC</div>
 </div>
@@ -1099,7 +1132,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-08-11-0834';
+const APP_VERSION = '2026-08-11-1104';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1131,6 +1164,15 @@ let operator = '';
 const ROSTER_SEED = ['Austin','Chance','Clint','Josh','Robert'];
 let roster = [];           // names shown in the picker: master list first, plus any extras typed on this device
 let collapsedGroups = new Set(); // chooser section names currently collapsed (persisted)
+// Month-end checklist (declared here — before init() — to avoid a let/const TDZ during first render)
+const DEPT_ORDER = ['Printing', 'Routing', 'Finishing', 'Asset Management'];
+const DEPT_EMAIL = {
+  'Printing':         'printing@endlessedge.com',
+  'Routing':          'router@endlessedge.com',
+  'Finishing':        'finishing@endlessedge.com',
+  'Asset Management': 'robert@endlessedge.com',
+};
+let checklistOpen = null;  // null = auto (open when month-end is near AND work is outstanding)
 let pendingImport = null;
 let npCurrent = '0';
 let entryCtx = null;
@@ -1317,6 +1359,128 @@ function pickCC(id) {
   renderAll();
   switchTab('count');
 }
+// ── MONTH-END CHECKLIST ───────────────────────────────
+// (DEPT_ORDER / DEPT_EMAIL / checklistOpen are declared up top with the other globals so
+//  the init() IIFE, which renders the chooser+checklist, doesn't hit a let/const TDZ.)
+function inThisMonth(ts) {
+  if (!ts) return false;
+  const d = new Date(ts), n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth();
+}
+function daysLeftInMonth() {
+  const n = new Date();
+  const last = new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate();
+  return last - n.getDate();
+}
+function monthLabel() { return new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }); }
+// Has this CC been counted in the CURRENT calendar month? Returns {done, when, who}.
+function monthStatus(id) {
+  const cc = cycleCounts[id];
+  let when = 0, who = '';
+  history.forEach(h => {
+    if (h.ccId === id && inThisMonth(h.at) && (h.at || 0) >= when) {
+      when = h.at || 0; if (h.by && h.by !== 'Printing') who = h.by;
+    }
+  });
+  if (cc && cc.finalizedAt && inThisMonth(cc.finalizedAt) && cc.finalizedAt >= when) {
+    when = cc.finalizedAt; if (cc.finalizedBy && cc.finalizedBy !== 'Printing') who = cc.finalizedBy;
+  }
+  return { done: when > 0, when, who };
+}
+function outstandingTotal() { return Object.keys(cycleCounts).filter(id => !monthStatus(id).done).length; }
+function toggleChecklist() {
+  const cur = (checklistOpen === null) ? (daysLeftInMonth() <= 7 && outstandingTotal() > 0) : checklistOpen;
+  checklistOpen = !cur;
+  renderMonthChecklist();
+}
+function urgencyClass(outstanding) {
+  if (outstanding === 0) return 'ok';
+  const dl = daysLeftInMonth();
+  return dl <= 3 ? 'red' : (dl <= 7 ? 'amber' : 'blue');
+}
+function remindCount(id) {
+  const cc = cycleCounts[id], dept = groupOf(id);
+  const to = DEPT_EMAIL[dept] || 'robert@endlessedge.com';
+  const nm = (cc && cc.name) ? cc.name : id, dl = daysLeftInMonth();
+  const subj = 'Cycle Count reminder: ' + nm + ' (CC ' + id + ')';
+  const body = 'Reminder to perform this cycle count for ' + monthLabel() + ':\n\n' +
+    '  • CC ' + id + ' — ' + nm + '  [' + dept + ']\n\n' +
+    'It has NOT been counted yet this month. ' + dl + ' day(s) left in the month.\n\n' +
+    'Open the scanner: https://endlessedge1997.github.io/Cycle-Counts/\n\n— Endless Edge Month-End Cycle Count';
+  window.location.href = 'mailto:' + to + '?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(body);
+}
+function remindDept(dept) {
+  const ids = Object.keys(cycleCounts).filter(id => groupOf(id) === dept && !monthStatus(id).done)
+    .sort((a, b) => String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
+  if (!ids.length) { showToast('Nothing outstanding in ' + dept); return; }
+  const to = DEPT_EMAIL[dept] || 'robert@endlessedge.com', dl = daysLeftInMonth();
+  const list = ids.map(id => '  • CC ' + id + ' — ' + (cycleCounts[id].name || id)).join('\n');
+  const subj = '[' + dept + '] ' + ids.length + ' cycle count(s) due — ' + monthLabel();
+  const body = 'The following ' + dept + ' cycle counts still need to be performed for ' + monthLabel() + ':\n\n' +
+    list + '\n\n' + dl + ' day(s) left in the month.\n\n' +
+    'Open the scanner: https://endlessedge1997.github.io/Cycle-Counts/\n\n— Endless Edge Month-End Cycle Count';
+  window.location.href = 'mailto:' + to + '?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(body);
+}
+function renderMonthChecklist() {
+  const el = document.getElementById('monthChecklist');
+  if (!el) return;
+  const ids = Object.keys(cycleCounts);
+  if (!ids.length) { el.innerHTML = ''; return; }
+  const total = ids.length;
+  const doneTotal = ids.filter(id => monthStatus(id).done).length;
+  const out = total - doneTotal;
+  const dl = daysLeftInMonth();
+  const open = (checklistOpen === null) ? (dl <= 7 && out > 0) : checklistOpen;
+  const urg = urgencyClass(out);
+  let html = '<div class="mchk-head mchk-' + urg + '" onclick="toggleChecklist()">' +
+    '<div><div class="mchk-title">🗓 Month-End Checklist</div>' +
+    '<div class="mchk-sub">' + esc(monthLabel()) + ' &middot; ' + doneTotal + '/' + total + ' done &middot; ' +
+      dl + ' day' + (dl === 1 ? '' : 's') + ' left</div></div>' +
+    '<span class="mchk-chev">' + (open ? '▾' : '▸') + '</span></div>';
+  if (open) {
+    html += '<div class="mchk-body">';
+    if (out === 0) {
+      html += '<div class="mchk-banner mchk-ok">✓ All counts completed for ' + esc(monthLabel()) + '</div>';
+    } else if (dl <= 7) {
+      html += '<div class="mchk-banner mchk-' + urg + '">⚠ ' + out + ' count' + (out === 1 ? '' : 's') +
+        ' still due — only ' + dl + ' day' + (dl === 1 ? '' : 's') + ' left this month</div>';
+    }
+    DEPT_ORDER.concat(Object.keys(cycleCounts).map(groupOf).filter(g => DEPT_ORDER.indexOf(g) < 0)).forEach((dept, di, arr) => {
+      if (arr.indexOf(dept) !== di) return; // de-dupe extra groups
+      const dids = ids.filter(id => groupOf(id) === dept)
+        .sort((a, b) => String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
+      if (!dids.length) return;
+      const dDone = dids.filter(id => monthStatus(id).done).length;
+      const dOut = dids.length - dDone;
+      const badge = dOut === 0 ? 'ok' : urgencyClass(dOut);
+      const dsafe = esc(dept).replace(/'/g, "\\'");
+      html += '<div class="mchk-dept"><div class="mchk-dept-head">' +
+        '<span class="mchk-dept-name">' + esc(dept) + '</span>' +
+        '<span class="mchk-dept-prog mchk-' + badge + '">' + dDone + '/' + dids.length + ' done</span>' +
+        (dOut > 0 ? '<button class="mchk-remind" onclick="event.stopPropagation();remindDept(\'' + dsafe + '\')">✉ Remind</button>' : '') +
+        '</div>';
+      dids.forEach(id => {
+        const st = monthStatus(id);
+        const nm = esc(cycleCounts[id].name || id);
+        const escId = esc(id).replace(/'/g, "\\'");
+        if (st.done) {
+          const w = new Date(st.when).toLocaleDateString('en-US');
+          html += '<div class="mchk-row done" onclick="pickCC(\'' + escId + '\')">' +
+            '<span class="mchk-ck">✓</span><span class="mchk-name">' + nm + '</span>' +
+            '<span class="mchk-meta">' + w + (st.who ? ' &middot; ' + esc(st.who) : '') + '</span></div>';
+        } else {
+          html += '<div class="mchk-row todo" onclick="pickCC(\'' + escId + '\')">' +
+            '<span class="mchk-ck"></span><span class="mchk-name">' + nm + '</span>' +
+            '<span class="mchk-meta mchk-todo-txt">Not counted</span>' +
+            '<button class="mchk-remind1" title="Email a reminder" onclick="event.stopPropagation();remindCount(\'' + escId + '\')">✉</button></div>';
+        }
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
 // Which section a CC belongs to — read straight from the baked seed (always present in the HTML).
 function groupOf(id) {
   const s = (typeof SEED_CCS !== 'undefined') ? SEED_CCS[id] : null;
@@ -1375,6 +1539,7 @@ function ccCardHtml(id) {
   </button>`;
 }
 function renderCcChooser() {
+  renderMonthChecklist();
   const list = document.getElementById('ccChooserList');
   if (!list) return;
   // Show close button only when a CC is already picked (otherwise you must pick one to proceed)
