@@ -517,6 +517,9 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 .send-sel-row .ssr-name{font-family:var(--sans);font-weight:700;font-size:14.5px;color:var(--text);line-height:1.2}
 .send-sel-row .ssr-sub{font-family:var(--sans);font-size:12px;color:var(--muted);margin-top:2px}
 .send-sel-row .ssr-partial{color:var(--gold)}
+.send-review-lbl{margin-top:14px;font-family:var(--sans);font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4}
+.send-2col{display:flex;gap:8px;margin-top:8px}
+.send-2col .btn{flex:1;margin-top:0}
 </style>
 </head>
 <body>
@@ -947,7 +950,10 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
         Paste the <strong>same CSV</strong> the counter sent you. This prints a report showing, per location: what the <strong>system had before</strong> (Pace on-hand), what was <strong>counted</strong>, and the <strong>variance</strong> — with the cycle count name and date.
       </p>
       <textarea id="reportCsv" placeholder='Paste the counter&apos;s CSV here — starts with "Cycle Count","Item Number",…' style="width:100%;min-height:90px;max-height:40vh;resize:vertical;font-family:var(--code);font-size:12px;line-height:1.45;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);margin-bottom:10px"></textarea>
-      <button class="btn btn-green" onclick="printVarianceReport()" style="margin:0">🖨 Generate &amp; Print Report</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-green" onclick="printVarianceReport()" style="margin:0;flex:1">🖨 Generate &amp; Print</button>
+        <button class="btn btn-green" onclick="emailVarianceReport()" style="margin:0;flex:1">📧 Email Report</button>
+      </div>
     </div>
   </div>
 
@@ -1143,7 +1149,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-08-14-1556';
+const APP_VERSION = '2026-08-14-1637';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3705,7 +3711,10 @@ function renderExportSummary() {
     'Any <strong>item notes</strong> you added are pasted into the email <strong>under the CSV</strong>' +
     (selNotes ? ' (' + selNotes + ' note' + (selNotes === 1 ? '' : 's') + ' will be included)' : '') +
     '. Notes are <strong>cleared when you finalize</strong>.</p>';
-  html += '<button class="btn btn-green btn-xl" onclick="printVarianceSelected()">🖨 Print Variance Report (review first)</button>';
+  html += '<div class="send-review-lbl">Review before sending — can\'t print from your phone? tap Email and open it on a PC:</div>';
+  html += '<div class="send-2col">' +
+    '<button class="btn btn-green" onclick="printVarianceSelected()">🖨 Print Variance</button>' +
+    '<button class="btn btn-green" onclick="emailVarianceSelected()">📧 Email Variance</button></div>';
   html += '<button class="btn btn-gold btn-xl" onclick="finalizeSelected()">✔ Finalize Selected &amp; Clear</button>';
   html += '<div class="send-extra"><button class="btn btn-ghost" onclick="downloadSelected()">⬇ Backup CSV</button></div>';
   el.innerHTML = html;
@@ -4024,15 +4033,49 @@ const VARIANCE_GROUP_CSS =
   '.grp.gzero td{background:#eee;color:#555}' +
   '.was{color:#c47b00;font-size:7.5pt;font-weight:normal}';
 
+// Open a self-contained report HTML in a new window and trigger Print.
+function openReportWindow(html) {
+  const win = window.open('', '_blank', 'width=900,height=1100');
+  if (!win) { showToast('Popup blocked — allow popups, then retry', 'err'); return; }
+  win.document.open(); win.document.write(html); win.document.close();
+  setTimeout(() => { try { win.focus(); win.print(); } catch(e){} }, 300);
+}
+// Email a report as an .html FILE — best for phones that can't print. On mobile the share sheet
+// attaches the file (open it on a PC); otherwise it downloads and opens a mailto to attach.
+function emailReportHtml(html, fileBase, subject) {
+  const fname = fileBase + '_' + new Date().toISOString().slice(0,10) + '.html';
+  try {
+    const file = new File([html], fname, { type: 'text/html' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ title: subject, text: subject + '\n(Open the attached file on a computer.)', files: [file] })
+        .then(() => showToast('Shared — pick Mail, then send'))
+        .catch(err => { if (!(err && err.name === 'AbortError')) fallbackEmailHtml(html, fname, subject); });
+      return;
+    }
+  } catch (e) {}
+  fallbackEmailHtml(html, fname, subject);
+}
+function fallbackEmailHtml(html, fname, subject) {
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = fname;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+  const body = 'The variance report "' + fname + '" was saved to your Downloads.\n\n' +
+    'Attach that file to this email (or just open it on your computer to view/print).';
+  window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  showToast('Report downloaded — attach it to the email');
+}
+
 // VARIANCE REPORT (manager) ────────────────────────────
 // Builds a printable report from the counter's pasted CSV: system on-hand (before) vs
 // counted vs variance, with the cycle count name and date. Everything comes from the CSV.
-function printVarianceReport() {
+function varianceCsvHtml() {
   const raw = (document.getElementById('reportCsv').value || '').trim();
-  if (!raw) { showToast('Paste the counter\'s CSV first', 'err'); return; }
+  if (!raw) { showToast('Paste the counter\'s CSV first', 'err'); return null; }
   let rows;
-  try { rows = parseCsv(raw); } catch(e) { showToast('Could not read that CSV', 'err'); return; }
-  if (rows.length < 2) { showToast('CSV looks empty', 'err'); return; }
+  try { rows = parseCsv(raw); } catch(e) { showToast('Could not read that CSV', 'err'); return null; }
+  if (rows.length < 2) { showToast('CSV looks empty', 'err'); return null; }
   const H = rows[0].map(h => String(h || '').trim().toLowerCase());
   const idx = name => H.indexOf(name);
   const iCC = idx('cycle count'), iItem = idx('item number'), iDesc = idx('description'),
@@ -4040,7 +4083,7 @@ function printVarianceReport() {
         iOh = idx('on hand'), iQty = idx('count qty'), iBy = idx('by'), iDate = idx('date');
   if (iItem < 0 || iOh < 0 || iQty < 0) {
     showToast('CSV missing required columns (Item / On Hand / Count Qty)', 'err');
-    return;
+    return null;
   }
   const data = [];
   let ccId = '', operator = '', countDate = '';
@@ -4062,7 +4105,7 @@ function printVarianceReport() {
       oh, qty, variance: qty - oh
     });
   }
-  if (!data.length) { showToast('No data rows found in the CSV', 'err'); return; }
+  if (!data.length) { showToast('No data rows found in the CSV', 'err'); return null; }
   // Sort by bin (location), then item number.
   data.sort((a, b) => {
     const c = a.bin.localeCompare(b.bin, undefined, { numeric: true });
@@ -4118,19 +4161,16 @@ function printVarianceReport() {
     '</table>' +
     '<div class="summary">Rows with a variance: <strong>' + varCount + '</strong> of ' + data.length + '</div>' +
     '</body></html>';
-  const win = window.open('', '_blank', 'width=900,height=1100');
-  if (!win) { showToast('Popup blocked — allow popups, then retry', 'err'); return; }
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-  setTimeout(() => { try { win.focus(); win.print(); } catch(e){} }, 300);
+  return html;
 }
+function printVarianceReport() { const h = varianceCsvHtml(); if (h) openReportWindow(h); }
+function emailVarianceReport() { const h = varianceCsvHtml(); if (h) emailReportHtml(h, 'variance_report', 'Cycle Count Variance Report — Endless Edge — ' + new Date().toLocaleDateString()); }
 
 // Variance report built from the app's OWN count data for the CHECKED counts — for the
 // counter to review/investigate before sending. One section per cycle count, with notes.
-function printVarianceSelected() {
+function varianceSelectedHtml() {
   const ids = selectedExportIds();
-  if (!ids.length) { showToast('Check at least one count to review', 'err'); return; }
+  if (!ids.length) { showToast('Check at least one count to review', 'err'); return null; }
   const fnum = n => { const v = Math.round(n * 1000) / 1000; return Number.isInteger(v) ? v.toString() : v.toFixed(3).replace(/0+$/,'').replace(/\.$/,''); };
   let sections = '', gRows = 0, gVarRows = 0, gVar = 0, gChanged = 0;
   ids.forEach(id => {
@@ -4166,7 +4206,7 @@ function printVarianceSelected() {
       '<td class="num" style="' + (tVar < 0 ? 'color:#c00' : tVar > 0 ? 'color:#0a7' : '') + '">' + (tVar > 0 ? '+' : '') + fnum(tVar) + '</td></tr></tfoot></table>' +
       notesHtml + '</div>';
   });
-  if (!sections) { showToast('Selected counts have no rows', 'err'); return; }
+  if (!sections) { showToast('Selected counts have no rows', 'err'); return null; }
   const css =
     '@page{margin:12mm 10mm;size:portrait}' +
     '*{box-sizing:border-box;margin:0;padding:0}' +
@@ -4197,11 +4237,10 @@ function printVarianceSelected() {
     '<div class="meta">On-hand shown is the <b>latest synced Pace data</b>' +
     (gChanged ? ' &middot; <b style="color:#c47b00">' + gChanged + ' row' + (gChanged === 1 ? '' : 's') + ' updated since counted (see "was")</b>' : ' (unchanged since counted)') +
     '</div></div>' + sections + '</body></html>';
-  const win = window.open('', '_blank', 'width=900,height=1100');
-  if (!win) { showToast('Popup blocked — allow popups, then retry', 'err'); return; }
-  win.document.open(); win.document.write(html); win.document.close();
-  setTimeout(() => { try { win.focus(); win.print(); } catch(e){} }, 300);
+  return html;
 }
+function printVarianceSelected() { const h = varianceSelectedHtml(); if (h) openReportWindow(h); }
+function emailVarianceSelected() { const h = varianceSelectedHtml(); if (h) emailReportHtml(h, 'variance_review', 'Cycle Count Variance Review — Endless Edge — ' + new Date().toLocaleDateString()); }
 
 function printHistory() {
   const rows = filteredHistoryForExport();
