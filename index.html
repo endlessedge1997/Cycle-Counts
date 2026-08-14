@@ -1143,7 +1143,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-08-11-1449';
+const APP_VERSION = '2026-08-14-1214';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3612,6 +3612,21 @@ function finalizeAllAssets() {
   renderExportSummary();
   showToast('Finalized ' + ids.length + ' asset counts — reset for next pass');
 }
+// Current system on-hand for a counted row, read from the LATEST synced data (not the value
+// frozen on the count entry). Lets the variance recompute after a Pace fix + fresh sync,
+// without re-counting. Returns null if the item/bin no longer exists (caller falls back).
+function currentOhFor(ccId, itemNum, bin, lot) {
+  const cc = cycleCounts[ccId];
+  if (!cc || !cc.items || !cc.items[itemNum]) return null;
+  const m = mergedBins(itemNum, cc.items[itemNum], ccId)
+    .find(b => b.bin === bin && (b.lot || '') === (lot || ''));
+  return m ? (parseFloat(m.oh) || 0) : null;
+}
+// On-hand to USE for a count row: current synced value if available, else the frozen snapshot.
+function liveOh(c) {
+  const cur = currentOhFor(c.ccId || activeCC, c.itemNum, c.bin, c.lot);
+  return (cur !== null) ? cur : (parseFloat(c.oh) || 0);
+}
 // Counted/total for ANY cycle count (mirrors activeCCTotals but for a given id).
 function ccTotals(id) {
   const cc = cycleCounts[id];
@@ -3775,22 +3790,25 @@ function rowsForIds(ids) {
 }
 function buildCSVFromRows(rowObjs) {
   const header = '"Cycle Count","Item Number","Description","Bin","Lot ID","Lot Label","On Hand","UOM","Count Qty","Variance","Bin Change","Date","Time","By"';
-  const rows = rowObjs.map(c => [
+  const rows = rowObjs.map(c => {
+    const oh = liveOh(c); // current synced on-hand (reflects Pace fixes after a re-sync)
+    return [
     '"'+(c.ccId||activeCC)+'"',
     '"'+c.itemNum+'"',
     '"'+String(c.desc||'').replace(/"/g,'""')+'"',
     '"'+String(c.bin||'').replace(/"/g,'""')+'"',
     '"'+String(c.lot||'').replace(/"/g,'""')+'"',
     '"'+String(c.lotLabel||'').replace(/"/g,'""')+'"',
-    c.oh ?? 0,
+    oh,
     '"'+String(c.uom||'EA')+'"',
     c.countQty,
-    ((c.countQty||0) - (c.oh||0)).toFixed(2),
+    ((c.countQty||0) - oh).toFixed(2),
     '"'+(c.transfer ? 'NEW/TRANSFER BIN - UPDATE PACE' : '')+'"',
     '"'+(c.date||'')+'"',
     '"'+(c.time||'')+'"',
     '"'+String(c.by||'').replace(/"/g,'""')+'"',
-  ].join(','));
+  ].join(',');
+  });
   return header + '\n' + rows.join('\n');
 }
 function buildCSV(scope) { return buildCSVFromRows(rowsForScope(scope)); }
@@ -4086,21 +4104,30 @@ function printVarianceSelected() {
   const ids = selectedExportIds();
   if (!ids.length) { showToast('Check at least one count to review', 'err'); return; }
   const fnum = n => { const v = Math.round(n * 1000) / 1000; return Number.isInteger(v) ? v.toString() : v.toFixed(3).replace(/0+$/,'').replace(/\.$/,''); };
-  let sections = '', gRows = 0, gVarRows = 0, gVar = 0;
+  let sections = '', gRows = 0, gVarRows = 0, gVar = 0, gChanged = 0;
   ids.forEach(id => {
     const cc = cycleCounts[id];
     const src = (counts[id] || []).filter(c => !isBinHidden(c.bin));
     if (!src.length) return;
-    const data = src.map(c => ({ item: c.itemNum, desc: c.desc || '', bin: c.bin || '', lot: c.lotLabel || c.lot || '', oh: c.oh || 0, qty: c.countQty || 0, variance: (c.countQty || 0) - (c.oh || 0) }));
+    const data = src.map(c => {
+      const frozen = parseFloat(c.oh) || 0;
+      const cur = currentOhFor(id, c.itemNum, c.bin, c.lot);
+      const oh = (cur !== null) ? cur : frozen;
+      const was = (cur !== null && Math.abs(cur - frozen) > 0.0001) ? frozen : null;
+      return { item: c.itemNum, desc: c.desc || '', bin: c.bin || '', lot: c.lotLabel || c.lot || '', oh, was, qty: c.countQty || 0, variance: (c.countQty || 0) - oh };
+    });
     data.sort((a, b) => { const cmp = a.bin.localeCompare(b.bin, undefined, { numeric: true }); if (cmp) return cmp; const an = parseInt(a.item, 10), bn = parseInt(b.item, 10); if (!isNaN(an) && !isNaN(bn) && an !== bn) return an - bn; return a.item.localeCompare(b.item); });
     const varRows = data.filter(d => Math.abs(d.variance) > 0.0001).length;
+    const changedRows = data.filter(d => d.was !== null).length;
+    gChanged += changedRows;
     const tOh = data.reduce((a, d) => a + d.oh, 0), tQty = data.reduce((a, d) => a + d.qty, 0), tVar = tQty - tOh;
     gRows += data.length; gVarRows += varRows; gVar += tVar;
     const body = data.map(d => {
       const vneg = d.variance < -0.0001, vpos = d.variance > 0.0001;
       const vcol = vneg ? 'color:#c00;font-weight:bold' : vpos ? 'color:#0a7;font-weight:bold' : 'color:#888';
+      const ohCell = fnum(d.oh) + (d.was !== null ? '<span class="was"> (was ' + fnum(d.was) + ')</span>' : '');
       return '<tr><td>' + esc(d.item) + '</td><td class="desc">' + esc(d.desc) + '</td><td>' + esc(d.bin) + '</td><td>' + esc(d.lot) + '</td>' +
-        '<td class="num">' + fnum(d.oh) + '</td><td class="num">' + fnum(d.qty) + '</td>' +
+        '<td class="num">' + ohCell + '</td><td class="num">' + fnum(d.qty) + '</td>' +
         '<td class="num" style="' + vcol + '">' + (d.variance > 0 ? '+' : '') + fnum(d.variance) + '</td></tr>';
     }).join('');
     let notesHtml = '';
@@ -4135,6 +4162,7 @@ function printVarianceSelected() {
     'tfoot td{border-top:2px solid #000;font-weight:bold;background:#fff}' +
     '.notes{margin-top:5px;font-size:8.5pt;background:#fff8e1;border:1px solid #f0c14b;border-radius:4px;padding:6px 8px;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
     '.notes ul{margin:3px 0 0 16px}' +
+    '.was{color:#c47b00;font-size:7.5pt;font-weight:normal}' +
     '.toolbar{position:fixed;top:8px;right:8px;background:#0072ff;color:#fff;padding:8px 12px;border-radius:6px;font-size:11px}' +
     '.toolbar button{background:#fff;color:#0072ff;border:none;padding:5px 12px;border-radius:4px;font-weight:bold;margin-left:6px;cursor:pointer}' +
     '@media print{.toolbar{display:none}}';
@@ -4143,7 +4171,10 @@ function printVarianceSelected() {
     '<div class="hd"><h1>Cycle Count Variance — Review</h1>' +
     '<div class="meta">Counter: ' + esc(operator || '—') + ' &middot; ' + ids.length + ' cycle count' + (ids.length === 1 ? '' : 's') +
     ' &middot; ' + gRows + ' rows &middot; ' + gVarRows + ' with variance &middot; Printed ' + new Date().toLocaleString() +
-    ' &middot; <b>NOT YET SENT / NOT FINALIZED</b></div></div>' + sections + '</body></html>';
+    ' &middot; <b>NOT YET SENT / NOT FINALIZED</b></div>' +
+    '<div class="meta">On-hand shown is the <b>latest synced Pace data</b>' +
+    (gChanged ? ' &middot; <b style="color:#c47b00">' + gChanged + ' row' + (gChanged === 1 ? '' : 's') + ' updated since counted (see "was")</b>' : ' (unchanged since counted)') +
+    '</div></div>' + sections + '</body></html>';
   const win = window.open('', '_blank', 'width=900,height=1100');
   if (!win) { showToast('Popup blocked — allow popups, then retry', 'err'); return; }
   win.document.open(); win.document.write(html); win.document.close();
