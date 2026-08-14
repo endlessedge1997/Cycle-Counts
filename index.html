@@ -1143,7 +1143,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-08-14-1214';
+const APP_VERSION = '2026-08-14-1556';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3984,6 +3984,46 @@ function printCurrent() {
   pa.innerHTML = '';
 }
 
+// Shared: build variance-table <tbody> rows GROUPED by variance sign — SHORT (negative)
+// first, then OVER (positive), then MATCH (no variance) — so issues are easy to spot.
+// Works for both variance reports; shows "(was N)" when a row carries a `was` value.
+function varianceGroupedBody(data, fnum) {
+  const sortBI = (a, b) => {
+    const c = String(a.bin).localeCompare(String(b.bin), undefined, { numeric: true });
+    if (c) return c;
+    const an = parseInt(a.item, 10), bn = parseInt(b.item, 10);
+    if (!isNaN(an) && !isNaN(bn) && an !== bn) return an - bn;
+    return String(a.item).localeCompare(String(b.item));
+  };
+  const neg  = data.filter(d => d.variance < -0.0001).sort((a, b) => (a.variance - b.variance) || sortBI(a, b));
+  const pos  = data.filter(d => d.variance > 0.0001).sort((a, b) => (b.variance - a.variance) || sortBI(a, b));
+  const zero = data.filter(d => Math.abs(d.variance) <= 0.0001).sort(sortBI);
+  const rowHtml = d => {
+    const vneg = d.variance < -0.0001, vpos = d.variance > 0.0001;
+    const vcol = vneg ? 'color:#c00;font-weight:bold' : vpos ? 'color:#0a7;font-weight:bold' : 'color:#888';
+    const ohCell = fnum(d.oh) + ((d.was !== undefined && d.was !== null) ? '<span class="was"> (was ' + fnum(d.was) + ')</span>' : '');
+    return '<tr><td>' + esc(d.item) + '</td><td class="desc">' + esc(d.desc) + '</td><td>' + esc(d.bin) + '</td><td>' + esc(d.lot) + '</td>' +
+      '<td class="num">' + ohCell + '</td><td class="num">' + fnum(d.qty) + '</td>' +
+      '<td class="num" style="' + vcol + '">' + (d.variance > 0 ? '+' : '') + fnum(d.variance) + '</td></tr>';
+  };
+  let out = '';
+  const grp = (label, arr, cls) => {
+    if (!arr.length) return;
+    out += '<tr class="grp ' + cls + '"><td colspan="7">' + label + ' (' + arr.length + ')</td></tr>' + arr.map(rowHtml).join('');
+  };
+  grp('▼ SHORT — negative variance', neg, 'gneg');
+  grp('▲ OVER — positive variance', pos, 'gpos');
+  grp('✓ MATCH — no variance', zero, 'gzero');
+  return out;
+}
+// Shared CSS for the variance-group header rows (added to each report's <style>).
+const VARIANCE_GROUP_CSS =
+  '.grp td{font-weight:bold;font-size:8.5pt;text-transform:uppercase;letter-spacing:.5px;padding:5px 6px;border-top:2px solid #000;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+  '.grp.gneg td{background:#ffdede;color:#a00}' +
+  '.grp.gpos td{background:#dff5e8;color:#0a6}' +
+  '.grp.gzero td{background:#eee;color:#555}' +
+  '.was{color:#c47b00;font-size:7.5pt;font-weight:normal}';
+
 // VARIANCE REPORT (manager) ────────────────────────────
 // Builds a printable report from the counter's pasted CSV: system on-hand (before) vs
 // counted vs variance, with the cycle count name and date. Everything comes from the CSV.
@@ -4038,20 +4078,7 @@ function printVarianceReport() {
     return (Number.isInteger(v) ? v.toString() : v.toFixed(3).replace(/0+$/,'').replace(/\.$/,''));
   };
   const varCount = data.filter(d => Math.abs(d.variance) > 0.0001).length;
-  const bodyRows = data.map(d => {
-    const vpos = d.variance > 0.0001, vneg = d.variance < -0.0001;
-    const vcolor = vneg ? 'color:#c00;font-weight:bold' : vpos ? 'color:#0a7;font-weight:bold' : 'color:#888';
-    const vtext = (d.variance > 0 ? '+' : '') + fnum(d.variance);
-    return `<tr>
-      <td>${esc(d.item)}</td>
-      <td class="desc">${esc(d.desc)}</td>
-      <td>${esc(d.bin)}</td>
-      <td>${esc(d.lot)}</td>
-      <td class="num">${fnum(d.oh)}</td>
-      <td class="num">${fnum(d.qty)}</td>
-      <td class="num" style="${vcolor}">${vtext}</td>
-    </tr>`;
-  }).join('');
+  const bodyRows = varianceGroupedBody(data, fnum);
   const css =
     '@page{margin:12mm 10mm;size:portrait}' +
     '*{box-sizing:border-box;margin:0;padding:0}' +
@@ -4070,7 +4097,8 @@ function printVarianceReport() {
     '.summary{margin-top:8px;font-size:9pt}' +
     '.toolbar{position:fixed;top:8px;right:8px;background:#0072ff;color:#fff;padding:8px 12px;border-radius:6px;font-size:11px}' +
     '.toolbar button{background:#fff;color:#0072ff;border:none;padding:5px 12px;border-radius:4px;font-weight:bold;margin-left:6px;cursor:pointer}' +
-    '@media print{.toolbar{display:none}}';
+    '@media print{.toolbar{display:none}}' +
+    VARIANCE_GROUP_CSS;
   const totalOh = data.reduce((a,d)=>a+d.oh,0), totalQty = data.reduce((a,d)=>a+d.qty,0);
   const totalVar = totalQty - totalOh;
   const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Variance Report — CC ' + esc(ccId) + '</title><style>' + css + '</style></head><body>' +
@@ -4122,14 +4150,7 @@ function printVarianceSelected() {
     gChanged += changedRows;
     const tOh = data.reduce((a, d) => a + d.oh, 0), tQty = data.reduce((a, d) => a + d.qty, 0), tVar = tQty - tOh;
     gRows += data.length; gVarRows += varRows; gVar += tVar;
-    const body = data.map(d => {
-      const vneg = d.variance < -0.0001, vpos = d.variance > 0.0001;
-      const vcol = vneg ? 'color:#c00;font-weight:bold' : vpos ? 'color:#0a7;font-weight:bold' : 'color:#888';
-      const ohCell = fnum(d.oh) + (d.was !== null ? '<span class="was"> (was ' + fnum(d.was) + ')</span>' : '');
-      return '<tr><td>' + esc(d.item) + '</td><td class="desc">' + esc(d.desc) + '</td><td>' + esc(d.bin) + '</td><td>' + esc(d.lot) + '</td>' +
-        '<td class="num">' + ohCell + '</td><td class="num">' + fnum(d.qty) + '</td>' +
-        '<td class="num" style="' + vcol + '">' + (d.variance > 0 ? '+' : '') + fnum(d.variance) + '</td></tr>';
-    }).join('');
+    const body = varianceGroupedBody(data, fnum);
     let notesHtml = '';
     const nn = notes[id];
     if (nn) {
@@ -4165,7 +4186,8 @@ function printVarianceSelected() {
     '.was{color:#c47b00;font-size:7.5pt;font-weight:normal}' +
     '.toolbar{position:fixed;top:8px;right:8px;background:#0072ff;color:#fff;padding:8px 12px;border-radius:6px;font-size:11px}' +
     '.toolbar button{background:#fff;color:#0072ff;border:none;padding:5px 12px;border-radius:4px;font-weight:bold;margin-left:6px;cursor:pointer}' +
-    '@media print{.toolbar{display:none}}';
+    '@media print{.toolbar{display:none}}' +
+    VARIANCE_GROUP_CSS;
   const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Variance Review — Endless Edge</title><style>' + css + '</style></head><body>' +
     '<div class="toolbar">Variance Review <button onclick="window.print()">Print</button></div>' +
     '<div class="hd"><h1>Cycle Count Variance — Review</h1>' +
