@@ -520,6 +520,14 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 .send-review-lbl{margin-top:14px;font-family:var(--sans);font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4}
 .send-2col{display:flex;gap:8px;margin-top:8px}
 .send-2col .btn{flex:1;margin-top:0}
+/* Export process overview + step badges */
+.ov-card{border:2px solid var(--green);background:var(--surface)}
+.ov-title{font-family:var(--head);font-weight:700;font-size:19px;letter-spacing:.3px;color:var(--text);margin-bottom:12px}
+.ov-steps{display:flex;flex-direction:column;gap:9px;margin-bottom:12px}
+.ov-step{display:flex;align-items:flex-start;gap:10px;font-family:var(--sans);font-size:14px;line-height:1.4;color:var(--text)}
+.ov-n{flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+.ov-warn{background:rgba(245,166,35,.16);border:1px solid var(--gold);border-radius:8px;padding:10px 12px;font-family:var(--sans);font-size:12.5px;line-height:1.45;color:var(--text)}
+.step-badge{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;padding:0 7px;border-radius:12px;background:var(--accent2);color:#fff;font-family:var(--sans);font-weight:800;font-size:12px;margin-right:8px}
 </style>
 </head>
 <body>
@@ -618,13 +626,52 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <!-- EXPORT TAB -->
 <div class="page" id="page-export">
-  <!-- SEND TO MANAGER — the main tool; used most, kept big & clear. Send, then Finalize, in one place. -->
+
+  <!-- PROCESS OVERVIEW -->
+  <div class="card ov-card">
+    <div class="ov-title">📤 Sending a Count — How it Works</div>
+    <div class="ov-steps">
+      <div class="ov-step"><span class="ov-n">1</span><span>Pick your count(s) and tap <b>Copy Count</b>.</span></div>
+      <div class="ov-step"><span class="ov-n">2</span><span><b>Print or Email the Variance Report</b> and look it over.</span></div>
+      <div class="ov-step"><span class="ov-n">3</span><span>Something wrong? <b>Fix it in Pace</b> → ask the manager to <b>refresh phones</b> → tap <b>Sync</b> → <b>re-copy &amp; re-check</b>. Repeat until clean.</span></div>
+      <div class="ov-step"><span class="ov-n">4</span><span>Once it's clean, <b>email the count to the manager</b>, then tap <b>Finalize</b>.</span></div>
+    </div>
+    <div class="ov-warn">⚠ Don't email a count until you've run the variance report, checked it, and fixed any issues (including items not pulled to jobs). The manager should only ever get a count you've already looked over.</div>
+  </div>
+
+  <!-- STEP 1–2: PICK & COPY -->
   <div class="card send-card">
-    <div class="send-title">📤 Send to Manager</div>
+    <div class="send-title"><span class="step-badge">1–2</span> Pick &amp; Copy your Count</div>
     <div id="sendCardBody"></div>
   </div>
 
-  <!-- HISTORY & backups — secondary, visually de-emphasized so it reads differently from Send -->
+  <!-- STEP 3: REVIEW VARIANCE (paste) -->
+  <div class="card" style="border:2px solid var(--accent)">
+    <div class="send-title"><span class="step-badge">3</span> Review the Variance</div>
+    <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:8px">
+      The count you copied is filled in below automatically (you can also paste it). This is <b style="color:var(--text)">exactly what the manager will see</b>. Print it, or Email it to open on a PC.
+    </p>
+    <textarea id="counterReviewCsv" placeholder='Tap "Copy Count" above and it appears here — or paste a copied count.' style="width:100%;min-height:90px;max-height:34vh;resize:vertical;font-family:var(--code);font-size:12px;line-height:1.45;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);margin-bottom:10px"></textarea>
+    <div class="send-2col">
+      <button class="btn btn-green" onclick="printCounterVariance()">🖨 Print Variance</button>
+      <button class="btn btn-green" onclick="emailCounterVariance()">📧 Email Variance</button>
+    </div>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="clearCounterReview()">✕ Clear</button>
+    <div class="ov-warn" style="margin-top:10px">Found a problem? Fix it in Pace, ask the manager to refresh phones, tap <b>Sync</b>, then <b>re-copy</b> (Step 1–2) and print again — it will reflect the corrected numbers.</div>
+  </div>
+
+  <!-- STEP 4: SEND & FINALIZE -->
+  <div class="card" style="border:2px solid var(--gold)">
+    <div class="send-title"><span class="step-badge" style="background:var(--gold)">4</span> Send to Manager &amp; Finalize</div>
+    <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:10px">
+      Variance clean? Send the count you copied to the manager, then finalize it so the phone resets for next time.
+    </p>
+    <button class="btn btn-primary btn-xl" onclick="emailCount()">📧 Email Count to Manager</button>
+    <p style="font-size:11.5px;color:var(--muted);line-height:1.5;margin:8px 2px">Your count is also on the clipboard — you can paste it straight into an email if you prefer.</p>
+    <button class="btn btn-gold btn-xl" onclick="finalizeSelected()">✔ Finalize the Count(s) I Sent &amp; Clear</button>
+  </div>
+
+  <!-- HISTORY & backups — secondary -->
   <div class="card card-secondary">
     <div class="card-title" style="font-size:13px;color:var(--muted)">🕓 History &amp; backups</div>
     <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
@@ -954,6 +1001,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
         <button class="btn btn-green" onclick="printVarianceReport()" style="margin:0;flex:1">🖨 Generate &amp; Print</button>
         <button class="btn btn-green" onclick="emailVarianceReport()" style="margin:0;flex:1">📧 Email Report</button>
       </div>
+      <button class="btn btn-ghost" style="margin-top:8px" onclick="document.getElementById('reportCsv').value='';showToast('Report box cleared')">✕ Clear pasted CSV</button>
     </div>
   </div>
 
@@ -1149,7 +1197,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-08-14-1637';
+const APP_VERSION = '2026-09-03-1500';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3707,15 +3755,10 @@ function renderExportSummary() {
   html += '<button class="btn btn-primary btn-xl" onclick="copySelected()">📋 Copy ' + selIds.length +
     ' Selected Count' + (selIds.length === 1 ? '' : 's') + '</button>';
   html += '<p class="send-note">Copies <strong>only the ' + selIds.length + ' checked count' + (selIds.length === 1 ? '' : 's') +
-    '</strong> above — partial counts are left out unless you check them. ' +
-    'Any <strong>item notes</strong> you added are pasted into the email <strong>under the CSV</strong>' +
-    (selNotes ? ' (' + selNotes + ' note' + (selNotes === 1 ? '' : 's') + ' will be included)' : '') +
-    '. Notes are <strong>cleared when you finalize</strong>.</p>';
-  html += '<div class="send-review-lbl">Review before sending — can\'t print from your phone? tap Email and open it on a PC:</div>';
-  html += '<div class="send-2col">' +
-    '<button class="btn btn-green" onclick="printVarianceSelected()">🖨 Print Variance</button>' +
-    '<button class="btn btn-green" onclick="emailVarianceSelected()">📧 Email Variance</button></div>';
-  html += '<button class="btn btn-gold btn-xl" onclick="finalizeSelected()">✔ Finalize Selected &amp; Clear</button>';
+    '</strong> above (partials are left out unless you check them) and <strong>fills the Review box below</strong>. ' +
+    'Any <strong>item notes</strong> ride along under the CSV' +
+    (selNotes ? ' (' + selNotes + ' note' + (selNotes === 1 ? '' : 's') + ')' : '') +
+    ' and are <strong>cleared when you finalize</strong>.</p>';
   html += '<div class="send-extra"><button class="btn btn-ghost" onclick="downloadSelected()">⬇ Backup CSV</button></div>';
   el.innerHTML = html;
 }
@@ -3743,7 +3786,46 @@ function copySelected() {
   const text = buildCSVFromRows(rows) + notesBlockFor(ids);
   const noteN = ids.reduce((n, id) => n + notesCountFor(id), 0);
   copyTextToClipboard(text, 'Copied ' + rows.length + ' rows' + (ids.length > 1 ? ' from ' + ids.length + ' counts' : '') +
-    (noteN ? ' + ' + noteN + ' note' + (noteN === 1 ? '' : 's') : '') + ' — paste into your email');
+    (noteN ? ' + ' + noteN + ' note' + (noteN === 1 ? '' : 's') : '') + ' — now review it in Step 3 below');
+  // Fill the Step 3 review box so the counter reviews the exact text they'll send.
+  const box = document.getElementById('counterReviewCsv');
+  if (box) box.value = text;
+}
+// Build the count text (CSV + notes) for the currently checked counts.
+function selectedCountText() {
+  const ids = selectedExportIds();
+  if (!ids.length) return null;
+  const rows = rowsForIds(ids);
+  if (!rows.length) return null;
+  return buildCSVFromRows(rows) + notesBlockFor(ids);
+}
+// STEP 3 — variance report built by PASTING the copied count (same tool + result as the manager's).
+function printCounterVariance() { const h = varianceCsvHtml(document.getElementById('counterReviewCsv').value); if (h) openReportWindow(h); }
+function emailCounterVariance() { const h = varianceCsvHtml(document.getElementById('counterReviewCsv').value); if (h) emailReportHtml(h, 'variance_review', 'Cycle Count Variance Review — Endless Edge — ' + new Date().toLocaleDateString()); }
+function clearCounterReview() { const b = document.getElementById('counterReviewCsv'); if (b) b.value = ''; showToast('Review box cleared'); }
+// STEP 4 — email the actual count (CSV + notes) to the manager for F12 processing.
+function emailCount() {
+  const text = selectedCountText();
+  if (!text) { showToast('Check at least one count to send', 'err'); return; }
+  const subject = 'Cycle Count — Endless Edge — ' + new Date().toLocaleDateString();
+  try {
+    if (navigator.share) {
+      navigator.share({ title: subject, text: text })
+        .then(() => showToast('Shared — pick Mail, then send'))
+        .catch(err => { if (!(err && err.name === 'AbortError')) mailtoCount(subject, text); });
+      return;
+    }
+  } catch (e) {}
+  mailtoCount(subject, text);
+}
+function mailtoCount(subject, text) {
+  const enc = encodeURIComponent(text);
+  if (enc.length > 6000) {
+    copyTextToClipboard(text, 'Count is long — copied to clipboard; paste it into a new email to the manager');
+    return;
+  }
+  window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + enc;
+  showToast('Opening email — check the manager address, then send');
 }
 function downloadSelected() {
   const ids = selectedExportIds();
@@ -4070,9 +4152,12 @@ function fallbackEmailHtml(html, fname, subject) {
 // VARIANCE REPORT (manager) ────────────────────────────
 // Builds a printable report from the counter's pasted CSV: system on-hand (before) vs
 // counted vs variance, with the cycle count name and date. Everything comes from the CSV.
-function varianceCsvHtml() {
-  const raw = (document.getElementById('reportCsv').value || '').trim();
-  if (!raw) { showToast('Paste the counter\'s CSV first', 'err'); return null; }
+function varianceCsvHtml(rawInput) {
+  let raw = (rawInput || '').trim();
+  if (!raw) { showToast('Copy or paste a count first', 'err'); return null; }
+  // Drop the appended "NOTES FROM COUNTER" block (if present) so it isn't parsed as CSV rows.
+  const ni = raw.indexOf('NOTES FROM COUNTER');
+  if (ni >= 0) { const ls = raw.lastIndexOf('\n', ni); raw = (ls >= 0 ? raw.slice(0, ls) : raw.slice(0, ni)).trim(); }
   let rows;
   try { rows = parseCsv(raw); } catch(e) { showToast('Could not read that CSV', 'err'); return null; }
   if (rows.length < 2) { showToast('CSV looks empty', 'err'); return null; }
@@ -4163,8 +4248,8 @@ function varianceCsvHtml() {
     '</body></html>';
   return html;
 }
-function printVarianceReport() { const h = varianceCsvHtml(); if (h) openReportWindow(h); }
-function emailVarianceReport() { const h = varianceCsvHtml(); if (h) emailReportHtml(h, 'variance_report', 'Cycle Count Variance Report — Endless Edge — ' + new Date().toLocaleDateString()); }
+function printVarianceReport() { const h = varianceCsvHtml(document.getElementById('reportCsv').value); if (h) openReportWindow(h); }
+function emailVarianceReport() { const h = varianceCsvHtml(document.getElementById('reportCsv').value); if (h) emailReportHtml(h, 'variance_report', 'Cycle Count Variance Report — Endless Edge — ' + new Date().toLocaleDateString()); }
 
 // Variance report built from the app's OWN count data for the CHECKED counts — for the
 // counter to review/investigate before sending. One section per cycle count, with notes.
