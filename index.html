@@ -539,6 +539,14 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 .ex-chip{display:inline-block;font-weight:800;padding:0 5px;border-radius:4px}
 .ex-neg{background:rgba(255,77,77,.25)}
 .ex-ok{background:rgba(39,201,122,.28)}
+/* In-app report overlay (works on phones where popups are blocked) */
+.report-ov{position:fixed;inset:0;z-index:2147483000;background:#fff;display:none;flex-direction:column}
+.report-ov.show{display:flex}
+.report-bar{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0e1118}
+.report-bar-title{flex:1;color:#fff;font-family:var(--sans);font-weight:700;font-size:14px;letter-spacing:.3px}
+.report-btn{background:#0072ff;color:#fff;border:none;border-radius:7px;padding:11px 14px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--sans)}
+.report-btn.report-close{background:#33405a}
+.report-frame{flex:1 1 auto;width:100%;border:0;background:#fff}
 </style>
 </head>
 <body>
@@ -678,11 +686,11 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
   <div class="card" style="border:2px solid var(--accent)">
     <div class="send-title"><span class="step-badge">3</span> Review the Variance</div>
     <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:8px">
-      The count you copied is filled in below automatically (you can also paste it). This is <b style="color:var(--text)">exactly what the manager will see</b>. Print it, or Email it to open on a PC.
+      The count you copied is filled in below automatically (you can also paste it). This is <b style="color:var(--text)">exactly what the manager will see</b>. Tap <b style="color:var(--text)">View</b> to read it right here on your phone, or <b style="color:var(--text)">Email</b> it to open on a PC.
     </p>
     <textarea id="counterReviewCsv" placeholder='Tap "Copy Count" above and it appears here — or paste a copied count.' style="width:100%;min-height:90px;max-height:34vh;resize:vertical;font-family:var(--code);font-size:12px;line-height:1.45;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);margin-bottom:10px"></textarea>
     <div class="send-2col">
-      <button class="btn btn-green" onclick="printCounterVariance()">🖨 Print Variance</button>
+      <button class="btn btn-green" onclick="printCounterVariance()">🔍 View Variance</button>
       <button class="btn btn-green" onclick="emailCounterVariance()">📧 Email Variance</button>
     </div>
     <button class="btn btn-ghost" style="margin-top:8px" onclick="clearCounterReview()">✕ Clear</button>
@@ -1226,7 +1234,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-03-1620';
+const APP_VERSION = '2026-09-03-1644';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -4145,11 +4153,36 @@ const VARIANCE_GROUP_CSS =
   '.was{color:#c47b00;font-size:7.5pt;font-weight:normal}';
 
 // Open a self-contained report HTML in a new window and trigger Print.
+// Show a report IN-APP (full-screen iframe overlay). Phones block window.open popups, so this
+// always works: the user can read/scroll the report on the phone and Print or Save-PDF from the bar.
 function openReportWindow(html) {
-  const win = window.open('', '_blank', 'width=900,height=1100');
-  if (!win) { showToast('Popup blocked — allow popups, then retry', 'err'); return; }
-  win.document.open(); win.document.write(html); win.document.close();
-  setTimeout(() => { try { win.focus(); win.print(); } catch(e){} }, 300);
+  let ov = document.getElementById('reportOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'reportOverlay';
+    ov.className = 'report-ov';
+    ov.innerHTML =
+      '<div class="report-bar">' +
+        '<span class="report-bar-title">Variance Report</span>' +
+        '<button class="report-btn" onclick="printReportOverlay()">🖨 Print / Save PDF</button>' +
+        '<button class="report-btn report-close" onclick="closeReportOverlay()">✕ Close</button>' +
+      '</div>' +
+      '<iframe id="reportFrame" class="report-frame" title="Variance Report"></iframe>';
+    document.body.appendChild(ov);
+  }
+  document.getElementById('reportFrame').srcdoc = html;
+  ov.classList.add('show');
+}
+function closeReportOverlay() {
+  const ov = document.getElementById('reportOverlay');
+  if (ov) ov.classList.remove('show');
+  const f = document.getElementById('reportFrame');
+  if (f) f.srcdoc = '';
+}
+function printReportOverlay() {
+  const f = document.getElementById('reportFrame');
+  try { f.contentWindow.focus(); f.contentWindow.print(); }
+  catch(e) { showToast('Printing is blocked on this device — use 📧 Email instead', 'err'); }
 }
 // Email a report as an .html FILE — best for phones that can't print. On mobile the share sheet
 // attaches the file (open it on a PC); otherwise it downloads and opens a mailto to attach.
