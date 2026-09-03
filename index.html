@@ -528,6 +528,17 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 .ov-n{flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
 .ov-warn{background:rgba(245,166,35,.16);border:1px solid var(--gold);border-radius:8px;padding:10px 12px;font-family:var(--sans);font-size:12.5px;line-height:1.45;color:var(--text)}
 .step-badge{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;padding:0 7px;border-radius:12px;background:var(--accent2);color:#fff;font-family:var(--sans);font-weight:800;font-size:12px;margin-right:8px}
+/* Worked example (collapsible) */
+.ex-box{border:1px solid var(--accent);border-radius:12px;background:rgba(0,198,255,.06);margin-bottom:14px;padding:2px 2px}
+summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:var(--text);padding:10px 12px;cursor:pointer}
+.ex-body{padding:2px 14px 12px}
+.ex-body p{margin:0 0 8px;font-family:var(--sans);font-size:13.5px;line-height:1.5;color:var(--text)}
+.ex-body ol{margin:6px 0 8px 20px}
+.ex-body li{font-family:var(--sans);font-size:13.5px;line-height:1.45;color:var(--text);margin-bottom:7px}
+.ex-note{background:rgba(245,166,35,.16);border-radius:6px;padding:9px 11px;margin-top:8px;font-family:var(--sans);font-size:13px;line-height:1.45;color:var(--text)}
+.ex-chip{display:inline-block;font-weight:800;padding:0 5px;border-radius:4px}
+.ex-neg{background:rgba(255,77,77,.25)}
+.ex-ok{background:rgba(39,201,122,.28)}
 </style>
 </head>
 <body>
@@ -638,6 +649,24 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
     </div>
     <div class="ov-warn">⚠ Don't email a count until you've run the variance report, checked it, and fixed any issues (including items not pulled to jobs). The manager should only ever get a count you've already looked over.</div>
   </div>
+
+  <!-- WORKED EXAMPLE -->
+  <details class="ex-box" open>
+    <summary class="ex-title">📎 Example — I found an error, now what?</summary>
+    <div class="ex-body">
+      <p>You counted <b>8</b>, but the variance report shows Pace had <b>10</b> → variance <span class="ex-chip ex-neg">−2</span>.</p>
+      <p>You check and find <b>2 were used on a job but never pulled in Pace</b>. Here's the fix:</p>
+      <ol>
+        <li><b>Fix it in Pace</b> — pull those 2 to the job (post the transaction). Pace now shows <b>8</b>. Do this for <u>every</u> error on the report first.</li>
+        <li>Tell the <b>manager to refresh phones</b> (push fresh Pace data).</li>
+        <li>On your phone, tap the <b>Sync</b> button.</li>
+        <li>Come back here → tap <b>Copy Count</b> again → <b>Print/Email Variance</b> again.</li>
+        <li>That item now reads <span class="ex-chip ex-ok">0 · MATCH</span> ✅ — the fix worked.</li>
+      </ol>
+      <div class="ex-note"><b>5 errors?</b> Same process — fix <u>all 5</u> in Pace first, <u>then</u> do <b>one</b> round of: manager refresh → <b>Sync</b> → <b>Copy Count</b> → re-check. You do <b>not</b> repeat it for each error.</div>
+      <div class="ex-note">When the report shows no surprises left (everything expected is a MATCH), <b>email the count to the manager</b> (Step 4) and <b>Finalize</b>. That's a clean count.</div>
+    </div>
+  </details>
 
   <!-- STEP 1–2: PICK & COPY -->
   <div class="card send-card">
@@ -1197,7 +1226,7 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-03-1500';
+const APP_VERSION = '2026-09-03-1620';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
