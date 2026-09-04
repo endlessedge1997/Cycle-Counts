@@ -95,9 +95,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
 .ccc-group-head:active{background:var(--surface2)}
 .ccc-group-head.ccc-inprog{background:rgba(39,201,122,.16);border-color:var(--green);cursor:default}
 /* Organize-into-subgroups UI */
-.ccc-organize-bar{width:100%;max-width:480px;display:flex;justify-content:flex-end;margin-bottom:10px}
+.ccc-organize-bar{width:100%;max-width:480px;display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px}
 .ccc-organize-btn{font-family:var(--sans);font-size:12.5px;font-weight:700;padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);cursor:pointer}
 .ccc-organize-btn.on{background:rgba(39,201,122,.2);border-color:var(--green)}
+.ccc-organize-btn.pub{background:rgba(0,198,255,.16);border-color:var(--accent2)}
+.ccc-organize-hint a{color:var(--accent2);font-weight:700}
 .ccc-organize-hint{width:100%;max-width:480px;font-family:var(--sans);font-size:12px;color:var(--text);line-height:1.4;margin-bottom:10px;background:rgba(0,198,255,.08);border:1px solid var(--border);border-radius:8px;padding:9px 11px}
 .ccc-subhead{width:100%;max-width:480px;display:flex;align-items:center;gap:8px;margin:10px 0 5px;font-family:var(--head);font-weight:700;font-size:13px;letter-spacing:.5px;text-transform:uppercase;color:var(--text)}
 .ccc-subhead-ung{opacity:.7}
@@ -1265,7 +1267,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-04-1108';
+const APP_VERSION = '2026-09-04-1124';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1312,6 +1314,7 @@ let subgroups = {};         // { ccId: subgroupName } — user organization WITH
 let subgroupNames = {};     // { department: [ordered subgroup names] }
 let organizeMode = false;   // chooser edit mode: add/rename/delete subgroups + move counts (not persisted)
 let dragCcId = null;        // ccId being dragged
+let layoutDirty = false;    // true when local subgroup layout has un-published changes
 let pendingImport = null;
 let npCurrent = '0';
 let entryCtx = null;
@@ -1351,6 +1354,7 @@ const FONT_ELEMENTS = [
   if (!Array.isArray(roster)) roster = [];
   try { subgroups     = JSON.parse(localStorage.getItem('pcc_subgroups') || '{}'); } catch(e) { subgroups = {}; }
   try { subgroupNames = JSON.parse(localStorage.getItem('pcc_subgroupNames') || '{}'); } catch(e) { subgroupNames = {}; }
+  try { layoutDirty   = localStorage.getItem('pcc_layoutDirty') === '1'; } catch(e) { layoutDirty = false; }
   // Master list always shows first; keep any extra names typed on this device after it.
   roster = ROSTER_SEED.concat(roster.filter(n => n && n !== 'Printing' && ROSTER_SEED.indexOf(n) < 0));
   // Make sure the current name is always in the picker list.
@@ -1416,6 +1420,7 @@ function persist() {
     localStorage.setItem('pcc_roster',       JSON.stringify(roster));
     localStorage.setItem('pcc_subgroups',    JSON.stringify(subgroups));
     localStorage.setItem('pcc_subgroupNames',JSON.stringify(subgroupNames));
+    localStorage.setItem('pcc_layoutDirty',  layoutDirty ? '1' : '0');
     if (operator) localStorage.setItem('pcc_op', operator);
   } catch(e) {}
 }
@@ -1708,7 +1713,7 @@ function addSubgroup(dept) {
   const nm = n.trim(); if (!nm) return;
   if (!Array.isArray(subgroupNames[dept])) subgroupNames[dept] = [];
   if (subgroupNames[dept].indexOf(nm) < 0) subgroupNames[dept].push(nm);
-  persist(); renderCcChooser();
+  layoutDirty = true; persist(); renderCcChooser();
 }
 function renameSubgroup(dept, oldName) {
   const n = prompt('Rename subgroup:', oldName);
@@ -1717,18 +1722,18 @@ function renameSubgroup(dept, oldName) {
   const arr = subgroupNames[dept] || []; const i = arr.indexOf(oldName);
   if (i >= 0) arr[i] = nm;
   Object.keys(subgroups).forEach(id => { if (subgroups[id] === oldName && groupOf(id) === dept) subgroups[id] = nm; });
-  persist(); renderCcChooser();
+  layoutDirty = true; persist(); renderCcChooser();
 }
 function deleteSubgroup(dept, name) {
   if (!confirm('Delete subgroup "' + name + '"?\n\nIts counts move back to Ungrouped (the counts themselves are not deleted).')) return;
   const arr = subgroupNames[dept] || []; const i = arr.indexOf(name);
   if (i >= 0) arr.splice(i, 1);
   Object.keys(subgroups).forEach(id => { if (subgroups[id] === name && groupOf(id) === dept) delete subgroups[id]; });
-  persist(); renderCcChooser();
+  layoutDirty = true; persist(); renderCcChooser();
 }
 function moveCcToSubgroup(id, name) {
   if (name && deptSubgroups(groupOf(id)).indexOf(name) >= 0) subgroups[id] = name; else delete subgroups[id];
-  persist(); renderCcChooser();
+  layoutDirty = true; persist(); renderCcChooser();
 }
 function onCcDragStart(ev, id) { dragCcId = id; try { ev.dataTransfer.setData('text/plain', id); ev.dataTransfer.effectAllowed = 'move'; } catch(e) {} }
 function onSubDragOver(ev) { ev.preventDefault(); try { ev.dataTransfer.dropEffect = 'move'; } catch(e) {} ev.currentTarget.classList.add('drop-hot'); }
@@ -1781,9 +1786,19 @@ function renderCcChooser() {
     list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No cycle counts available. Use the Setup tab to import.</div>';
     return;
   }
-  let html = '<div class="ccc-organize-bar"><button class="ccc-organize-btn' + (organizeMode ? ' on' : '') +
-    '" onclick="toggleOrganize()">' + (organizeMode ? '✓ Done organizing' : '✏️ Organize into groups') + '</button></div>';
-  if (organizeMode) html += '<div class="ccc-organize-hint">Drag a count (or use its ▾ picker) into a subgroup. Add / rename / delete subgroups per department. Changes save automatically.</div>';
+  let html = '<div class="ccc-organize-bar">' +
+    (organizeMode ? '<button class="ccc-organize-btn pub" onclick="publishLayout()">📤 Publish to all devices</button>' : '') +
+    '<button class="ccc-organize-btn' + (organizeMode ? ' on' : '') + '" onclick="toggleOrganize()">' +
+    (organizeMode ? '✓ Done' : '✏️ Organize into groups') + '</button></div>';
+  if (organizeMode) {
+    html += '<div class="ccc-organize-hint">' +
+      (layoutDirty
+        ? '<b style="color:#c47b00">● Unpublished changes on this device.</b> Tap <b>Publish to all devices</b> so every computer/phone gets this layout on their next Sync. '
+        : '<b style="color:#0a7">✓ This layout matches what\'s shared.</b> ') +
+      'Drag a count (or use its ▾ picker) into a subgroup; add / rename / delete subgroups per department.' +
+      (layoutDirty ? ' &nbsp;·&nbsp; <a href="#" onclick="event.preventDefault();discardLayoutChanges()">↺ discard my changes</a>' : '') +
+      '</div>';
+  }
   // In-progress counts (started, not finalized) — pinned at the TOP so a counter can immediately
   // continue the count they're on. Hidden in organize mode (they show in their department there).
   const inProg = Object.keys(counts)
@@ -3689,6 +3704,7 @@ async function syncFromGist(silent) {
     } catch(e) {}
     persist();
     try { localStorage.setItem('pcc_lastSync', JSON.stringify({ at: Date.now(), ccCount: ccKeys.length, totalRows, scrapedAt })); } catch(e) {}
+    await fetchSharedLayout(); // pull the shared group/subgroup layout too (unless local edits are unpublished)
     renderAll();
     updateSyncStatus();
     refreshVerPill();
@@ -3708,6 +3724,60 @@ async function syncNow() {
 
 const GIST_ID = 'dd6dd78a9c1644f0d5dd2ccd376bf366';
 const GIST_FILENAME = 'cycle_count.csv';
+const LAYOUT_FILENAME = 'layout.json';
+const LAYOUT_URL = 'https://gist.githubusercontent.com/endlessedge1997/dd6dd78a9c1644f0d5dd2ccd376bf366/raw/layout.json';
+
+// Pull the SHARED group/subgroup layout the gist so every device shows the same arrangement.
+// Skips if this device has un-published local edits (so a manager's in-progress work isn't clobbered).
+async function fetchSharedLayout(force) {
+  if (layoutDirty && !force) return;
+  try {
+    const r = await fetch(LAYOUT_URL + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return; // no layout published yet (404) — leave local as-is
+    const txt = (await r.text()).trim();
+    if (!txt) return;
+    const obj = JSON.parse(txt);
+    if (!obj || typeof obj !== 'object') return;
+    subgroups = (obj.subgroups && typeof obj.subgroups === 'object') ? obj.subgroups : {};
+    subgroupNames = (obj.subgroupNames && typeof obj.subgroupNames === 'object') ? obj.subgroupNames : {};
+    layoutDirty = false;
+    persist();
+  } catch(e) {}
+}
+// Publish THIS device's layout to the gist so everyone gets it on their next sync. Needs the token.
+async function publishLayout() {
+  let pat = getStoredPat();
+  if (!pat) {
+    pat = prompt('Paste the manager token (GitHub PAT, gist scope) to publish the group layout to all devices.\n\nSaved in this browser only. Ask Robert for the token if you don\'t have it.');
+    if (!pat) { showToast('No token — layout not published', 'err'); return; }
+    pat = pat.trim(); setStoredPat(pat);
+  }
+  showToast('Publishing layout…');
+  try {
+    const files = {};
+    files[LAYOUT_FILENAME] = { content: JSON.stringify({ subgroups, subgroupNames, at: new Date().toISOString() }) };
+    const res = await fetch('https://api.github.com/gists/' + GIST_ID, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + pat, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: files })
+    });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) { try { localStorage.removeItem('pcc_gh_pat'); } catch(e){} showToast('Token rejected — paste a fresh one next time', 'err'); }
+      else showToast('Publish failed: HTTP ' + res.status, 'err');
+      return;
+    }
+    layoutDirty = false; persist(); renderCcChooser();
+    showToast('Layout published — other devices get it on next Sync ✓');
+  } catch(e) { showToast('Publish failed (network)', 'err'); }
+}
+// Throw away local layout edits and re-pull the shared one (safety valve if a device gets out of step).
+async function discardLayoutChanges() {
+  if (!confirm('Discard this device\'s layout changes and use the shared (published) layout instead?')) return;
+  layoutDirty = false; persist();
+  await fetchSharedLayout(true);
+  renderCcChooser();
+  showToast('Using the shared layout');
+}
 
 function getStoredPat() {
   try { return localStorage.getItem('pcc_gh_pat') || ''; } catch(e) { return ''; }
