@@ -445,16 +445,23 @@ body.light .entry-overlay,body.light .counted-overlay{background:rgba(0,0,0,.5)}
    Placed last so it wins the cascade; only touches font (colors keep their high-contrast rules). */
 .pill{font-family:var(--sans);font-size:12.5px;font-weight:600;letter-spacing:.2px;padding:5px 11px}
 .pill .pill-lbl{font-family:var(--sans);font-size:10.5px;font-weight:700;letter-spacing:.2px}
-/* Chooser cards */
-.ccc-id{font-family:var(--sans);font-size:12.5px;font-weight:700;letter-spacing:.5px}
-.ccc-name{font-family:var(--head);font-size:22px;font-weight:700;line-height:1.2;letter-spacing:.2px}
-.ccc-stats{font-family:var(--sans);font-size:13.5px;font-weight:500;letter-spacing:0;margin-top:6px}
-.ccc-last{font-family:var(--sans);font-size:12.5px;font-weight:500;letter-spacing:0;margin-top:5px}
-.ccc-group-head{font-family:var(--head);font-size:16.5px;font-weight:700;letter-spacing:.5px}
-.ccc-group-count{font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:0}
+/* Chooser cards — compact so more fit on screen */
+.ccc-id{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.5px}
+.ccc-name{font-family:var(--head);font-size:17px;font-weight:700;line-height:1.15;letter-spacing:.2px}
+.ccc-stats{font-family:var(--sans);font-size:12px;font-weight:500;letter-spacing:0;margin-top:2px}
+.ccc-last{font-family:var(--sans);font-size:11.5px;font-weight:500;letter-spacing:0;margin-top:2px}
+.ccc-card{padding:9px 12px;gap:1px;border-radius:10px}
+.ccc-list{gap:7px}
+.ccc-group{gap:7px}
+.ccc-group-head{font-family:var(--head);font-size:15px;font-weight:700;letter-spacing:.5px;padding:9px 12px}
+.ccc-group-count{font-family:var(--sans);font-size:12.5px;font-weight:700;letter-spacing:0}
+#ccChooser{padding:18px 14px}
 .ccc-sub,.ccc-h2,.ccc-foot,.logo-sub,.og-sub,.og-foot{font-family:var(--sans)}
-.ccc-sub{font-size:11px;letter-spacing:1.5px}
-.ccc-h2{font-size:17px;letter-spacing:1px}
+.ccc-sub{font-size:11px;letter-spacing:1.5px;margin-bottom:12px}
+.ccc-h2{font-size:16px;letter-spacing:1px;margin-bottom:12px}
+.ccc-logo{font-size:20px;margin-bottom:2px}
+.mchk{margin-bottom:10px}
+.mchk-head{padding:10px 13px}
 .logo-sub{font-size:10px;letter-spacing:.8px}
 /* Count-tab bin lines: give the same crisp sans + a touch more size (still overridable by the A font editor) */
 .bin-loc,.bin-lot,.bin-oh,.bin-status{font-family:var(--sans)}
@@ -1234,7 +1241,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-03-1644';
+const APP_VERSION = '2026-09-04-0714';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1448,6 +1455,10 @@ function addOperatorName() {
 
 // CC CHOOSER ────────────────────────────────────────
 function openCcChooser() {
+  // Always open fully collapsed — every department section and the checklist start closed.
+  collapsedGroups = new Set(Object.values(SEED_CCS).map(s => s && s.group).filter(Boolean));
+  collapsedGroups.add('Other');
+  checklistOpen = false;
   renderCcChooser();
   document.getElementById('ccChooser').classList.remove('hidden');
 }
