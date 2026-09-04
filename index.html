@@ -1041,6 +1041,10 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
         Paste the <strong>same CSV</strong> the counter sent you. This prints a report showing, per location: what the <strong>system had before</strong> (Pace on-hand), what was <strong>counted</strong>, and the <strong>variance</strong> — with the cycle count name and date.
       </p>
       <textarea id="reportCsv" placeholder='Paste the counter&apos;s CSV here — starts with "Cycle Count","Item Number",…' style="width:100%;min-height:90px;max-height:40vh;resize:vertical;font-family:var(--code);font-size:12px;line-height:1.45;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);margin-bottom:10px"></textarea>
+      <label style="display:flex;align-items:flex-start;gap:8px;padding:9px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;cursor:pointer;font-size:12px;line-height:1.4">
+        <input type="checkbox" id="useLiveOh" checked style="width:18px;height:18px;flex-shrink:0;margin-top:1px">
+        <span>Use <strong>this device's current on-hand</strong> (recommended) — recomputes the variance against the latest Pace data you've synced, so an <strong>older count still shows corrected numbers</strong>. Uncheck to use the on-hand exactly as it was in the pasted CSV.<br><span style="color:var(--muted)">⤷ Tap <strong>Sync</strong> (or refresh) first so this device has fresh Pace data.</span></span>
+      </label>
       <div style="display:flex;gap:8px">
         <button class="btn btn-green" onclick="printVarianceReport()" style="margin:0;flex:1">🖨 Generate &amp; Print</button>
         <button class="btn btn-green" onclick="emailVarianceReport()" style="margin:0;flex:1">📧 Email Report</button>
@@ -1241,7 +1245,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-04-0714';
+const APP_VERSION = '2026-09-04-0723';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -4243,8 +4247,12 @@ function varianceCsvHtml(rawInput) {
     showToast('CSV missing required columns (Item / On Hand / Count Qty)', 'err');
     return null;
   }
+  // Use THIS device's current synced on-hand instead of the (possibly stale) on-hand in the pasted
+  // CSV, so an old count still shows the corrected variance. Toggle off with the "useLiveOh" checkbox.
+  const liveEl = document.getElementById('useLiveOh');
+  const useLive = liveEl ? liveEl.checked : true;
   const data = [];
-  let ccId = '', operator = '', countDate = '';
+  let ccId = '', operator = '', countDate = '', changed = 0;
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (row.length === 1 && !row[0]) continue;
@@ -4253,14 +4261,22 @@ function varianceCsvHtml(rawInput) {
     if (!ccId && iCC >= 0) ccId = String(row[iCC] || '').trim();
     if (!operator && iBy >= 0) operator = String(row[iBy] || '').trim();
     if (!countDate && iDate >= 0) countDate = String(row[iDate] || '').trim();
-    const oh = parseFloat(row[iOh]) || 0;
+    const csvOh = parseFloat(row[iOh]) || 0;
     const qty = parseFloat(row[iQty]) || 0;
+    const binVal = iBin >= 0 ? String(row[iBin] || '').trim() : '';
+    let oh = csvOh, was = null;
+    if (useLive) {
+      const rowCC = iCC >= 0 ? String(row[iCC] || '').trim() : ccId;
+      const lotId = iLotId >= 0 ? String(row[iLotId] || '').trim() : '';
+      const cur = currentOhFor(rowCC, item, binVal, lotId);
+      if (cur !== null) { oh = cur; if (Math.abs(cur - csvOh) > 0.0001) { was = csvOh; changed++; } }
+    }
     data.push({
       item,
       desc: iDesc >= 0 ? String(row[iDesc] || '').trim() : '',
-      bin: iBin >= 0 ? String(row[iBin] || '').trim() : '',
+      bin: binVal,
       lot: (iLotLabel >= 0 && row[iLotLabel]) ? String(row[iLotLabel]).trim() : (iLotId >= 0 ? String(row[iLotId] || '').trim() : ''),
-      oh, qty, variance: qty - oh
+      oh, was, qty, variance: qty - oh
     });
   }
   if (!data.length) { showToast('No data rows found in the CSV', 'err'); return null; }
@@ -4308,6 +4324,9 @@ function varianceCsvHtml(rawInput) {
       '<h1>Cycle Count Variance Report</h1>' +
       '<div class="sub">CC ' + esc(ccId) + (ccName ? ' — ' + esc(ccName) : '') + '</div>' +
       '<div class="meta">Counted by ' + esc(operator || '—') + (countDate ? ' · Count date ' + esc(countDate) : '') + ' · Printed ' + new Date().toLocaleString() + ' · ' + data.length + ' rows · ' + varCount + ' with variance</div>' +
+      '<div class="meta">On-hand: ' + (useLive
+        ? ('<b>your device\'s current synced Pace data</b>' + (changed ? ' · <b style="color:#c47b00">' + changed + ' row' + (changed === 1 ? '' : 's') + ' differ from the pasted CSV (see "was") — tap Sync first if numbers look old</b>' : ' (matches the pasted CSV)'))
+        : 'the values in the pasted CSV') + '</div>' +
     '</div>' +
     '<table><thead><tr>' +
       '<th>Item #</th><th>Description</th><th>Bin / Location</th><th>Lot</th>' +
