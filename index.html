@@ -693,9 +693,9 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
   <div class="card" style="border:2px solid var(--accent)">
     <div class="send-title"><span class="step-badge">3</span> Review the Variance</div>
     <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:8px">
-      The count you copied is filled in below automatically (you can also paste it). This is <b style="color:var(--text)">exactly what the manager will see</b>. Tap <b style="color:var(--text)">View</b> to read it right here on your phone, or <b style="color:var(--text)">Email</b> it to open on a PC.
+      <b style="color:var(--text)">Paste the count you copied</b> into the box below (long-press → Paste). This is <b style="color:var(--text)">exactly what the manager will see</b>. Tap <b style="color:var(--text)">View</b> to read it right here on your phone, or <b style="color:var(--text)">Email</b> it to open on a PC.
     </p>
-    <textarea id="counterReviewCsv" placeholder='Tap "Copy Count" above and it appears here — or paste a copied count.' style="width:100%;min-height:90px;max-height:34vh;resize:vertical;font-family:var(--code);font-size:12px;line-height:1.45;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);margin-bottom:10px"></textarea>
+    <textarea id="counterReviewCsv" placeholder='Paste the count you copied here…' style="width:100%;min-height:90px;max-height:34vh;resize:vertical;font-family:var(--code);font-size:12px;line-height:1.45;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);margin-bottom:10px"></textarea>
     <div class="send-2col">
       <button class="btn btn-green" onclick="printCounterVariance()">🔍 View Variance</button>
       <button class="btn btn-green" onclick="emailCounterVariance()">📧 Email Variance</button>
@@ -1245,7 +1245,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-04-0723';
+const APP_VERSION = '2026-09-04-0727';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3807,7 +3807,7 @@ function renderExportSummary() {
   html += '<button class="btn btn-primary btn-xl" onclick="copySelected()">📋 Copy ' + selIds.length +
     ' Selected Count' + (selIds.length === 1 ? '' : 's') + '</button>';
   html += '<p class="send-note">Copies <strong>only the ' + selIds.length + ' checked count' + (selIds.length === 1 ? '' : 's') +
-    '</strong> above (partials are left out unless you check them) and <strong>fills the Review box below</strong>. ' +
+    '</strong> above (partials are left out unless you check them). <strong>Paste it into the Review box below.</strong> ' +
     'Any <strong>item notes</strong> ride along under the CSV' +
     (selNotes ? ' (' + selNotes + ' note' + (selNotes === 1 ? '' : 's') + ')' : '') +
     ' and are <strong>cleared when you finalize</strong>.</p>';
@@ -3838,10 +3838,7 @@ function copySelected() {
   const text = buildCSVFromRows(rows) + notesBlockFor(ids);
   const noteN = ids.reduce((n, id) => n + notesCountFor(id), 0);
   copyTextToClipboard(text, 'Copied ' + rows.length + ' rows' + (ids.length > 1 ? ' from ' + ids.length + ' counts' : '') +
-    (noteN ? ' + ' + noteN + ' note' + (noteN === 1 ? '' : 's') : '') + ' — now review it in Step 3 below');
-  // Fill the Step 3 review box so the counter reviews the exact text they'll send.
-  const box = document.getElementById('counterReviewCsv');
-  if (box) box.value = text;
+    (noteN ? ' + ' + noteN + ' note' + (noteN === 1 ? '' : 's') : '') + ' — paste it into the Review box (Step 3)');
 }
 // Build the count text (CSV + notes) for the currently checked counts.
 function selectedCountText() {
