@@ -93,6 +93,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
 .ccc-group{width:100%;max-width:480px;display:flex;flex-direction:column;gap:10px}
 .ccc-group-head{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:var(--text);font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:1px;text-transform:uppercase}
 .ccc-group-head:active{background:var(--surface2)}
+.ccc-group-head.ccc-inprog{background:rgba(39,201,122,.16);border-color:var(--green);cursor:default}
 .ccc-group-count{font-family:var(--mono);font-size:12px;color:var(--gold);background:var(--surface2);border-radius:10px;padding:2px 8px;letter-spacing:1px}
 .ccc-last{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:.3px}
 
@@ -1107,6 +1108,8 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
     <div class="acc-body">
       <button class="btn btn-red" onclick="resetActiveCounts()">⚠ Clear Counts for Active Cycle Count</button>
       <p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">Removes counts from the current cycle count only. History entries remain. Items master is untouched.</p>
+      <button class="btn btn-red" style="margin-top:10px" onclick="clearAllCounts()">⚠ Clear ALL Counts (every cycle count)</button>
+      <p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">Wipes in-progress counts for <strong>every</strong> cycle count on this device — use to clear a stuck/partial count you can't select. History entries remain.</p>
       <button class="btn btn-red" style="margin-top:10px" onclick="clearAllHistory()">⚠ Clear All History</button>
       <p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">Wipes the History tab. Does not affect the current cycle count's counts.</p>
     </div>
@@ -1245,7 +1248,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-04-0753';
+const APP_VERSION = '2026-09-04-0853';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1669,10 +1672,22 @@ function renderCcChooser() {
     list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No cycle counts available. Use the Setup tab to import.</div>';
     return;
   }
-  // Bucket by section, then order sections (known first) and CCs (by name) within each.
+  let html = '';
+  // In-progress counts (started, not finalized) — pinned at the TOP, always expanded, so a counter
+  // can immediately find and continue the count they're on even when all groups are collapsed.
+  const inProg = Object.keys(counts)
+    .filter(id => (counts[id] || []).length > 0 && cycleCounts[id] && !cycleCounts[id].finalizedAt)
+    .sort((a, b) => String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
+  const inProgSet = new Set(inProg);
+  if (inProg.length) {
+    html += '<div class="ccc-group"><div class="ccc-group-head ccc-inprog">' +
+      '<span>▾ CONTINUE COUNTING</span><span class="ccc-group-count">' + inProg.length + '</span></div>' +
+      inProg.map(id => ccCardHtml(id)).join('') + '</div>';
+  }
+  // Bucket the REST by section (in-progress ones are shown above, not duplicated here).
   const GROUP_ORDER = ['Printing', 'Routing', 'Finishing', 'Asset Management'];
   const groups = {};
-  ids.forEach(id => { const g = groupOf(id); (groups[g] = groups[g] || []).push(id); });
+  ids.forEach(id => { if (inProgSet.has(id)) return; const g = groupOf(id); (groups[g] = groups[g] || []).push(id); });
   const gnames = Object.keys(groups).sort((a, b) => {
     const ia = GROUP_ORDER.indexOf(a), ib = GROUP_ORDER.indexOf(b);
     if (ia < 0 && ib < 0) return a.localeCompare(b);
@@ -1680,7 +1695,6 @@ function renderCcChooser() {
     if (ib < 0) return -1;
     return ia - ib;
   });
-  let html = '';
   gnames.forEach(g => {
     const gids = groups[g].sort((a, b) =>
       String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
@@ -3696,6 +3710,20 @@ function resetActiveCounts() {
   persist();
   renderAll();
   showToast('Cleared CC ' + activeCC + ' counts');
+}
+// Clear in-progress counts for EVERY cycle count (fixes a stuck/partial count you can't select).
+function clearAllCounts() {
+  const ccN = Object.keys(counts).filter(id => (counts[id] || []).length).length;
+  const rowN = Object.values(counts).reduce((a, arr) => a + (arr ? arr.length : 0), 0);
+  if (!rowN) { showToast('No counts to clear', 'err'); return; }
+  if (!confirm('Clear in-progress counts for ALL cycle counts on this device?\n\n' +
+    rowN + ' counted row(s) across ' + ccN + ' cycle count(s) will be removed. History is kept.')) return;
+  counts = {};
+  notes = {};
+  exportSel.clear();
+  persist();
+  renderAll();
+  showToast('Cleared all in-progress counts');
 }
 function clearAllHistory() {
   if (!history.length) { showToast('History is empty','err'); return; }
