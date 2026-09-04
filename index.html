@@ -113,6 +113,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
 .ccc-card.ccc-drag{cursor:grab}
 .ccc-draghandle{font-family:var(--sans);font-size:11px;color:var(--muted);margin-bottom:4px}
 .ccc-move{width:100%;margin-top:8px;padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;font-weight:600}
+/* Discreet paperclip shortcut in the chooser footer + the organize popup */
+.ccc-clip{cursor:pointer;font-size:15px;margin-left:8px;padding:2px}
+.org-overlay{position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding:14px;overflow-y:auto}
+.org-overlay.show{display:flex}
+.org-modal{background:var(--bg);border:1px solid var(--border);border-radius:14px;width:100%;max-width:520px;margin:auto;display:flex;flex-direction:column;max-height:92vh;overflow:hidden}
+.org-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--surface)}
+.org-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--head);font-weight:700;font-size:15px;color:var(--text)}
+.org-x{flex-shrink:0;background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:32px;height:32px;font-size:20px;line-height:1;color:var(--text);cursor:pointer}
+.org-foot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);background:var(--surface)}
+.org-pub{flex:1;font-family:var(--sans);font-size:13px;font-weight:700;padding:11px;border:1px solid var(--accent2);border-radius:8px;background:rgba(0,198,255,.16);color:var(--text);cursor:pointer}
+.org-done{flex:1;font-family:var(--sans);font-size:13px;font-weight:700;padding:11px;border:1px solid var(--green);border-radius:8px;background:rgba(39,201,122,.2);color:var(--text);cursor:pointer}
+.org-status{padding:9px 14px;font-family:var(--sans);font-size:12px;line-height:1.4;color:var(--text);border-bottom:1px solid var(--border);background:var(--surface2)}
+.org-status a{color:var(--accent2);font-weight:700}
+.org-body{padding:12px 12px;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column}
+.org-dept{margin-bottom:14px}
+.org-dept-head{font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:1px;text-transform:uppercase;color:var(--text);padding:6px 0;border-bottom:2px solid var(--border);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.org-body .ccc-subhead,.org-body .ccc-subzone,.org-body .ccc-addsub{max-width:none}
 .ccc-group-count{font-family:var(--mono);font-size:12px;color:var(--gold);background:var(--surface2);border-radius:10px;padding:2px 8px;letter-spacing:1px}
 .ccc-last{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:.3px}
 
@@ -598,7 +615,23 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
   <div class="ccc-h2">Select a Cycle Count</div>
   <div id="monthChecklist" class="mchk"></div>
   <div class="ccc-list" id="ccChooserList"></div>
-  <div class="ccc-foot">TAP A CARD TO START &middot; PROGRESS IS SAVED PER CC</div>
+  <div class="ccc-foot">TAP A CARD TO START &middot; PROGRESS IS SAVED PER CC <span class="ccc-clip" onclick="openOrganize()" title="Organize groups">📎</span></div>
+</div>
+
+<!-- ORGANIZE GROUPS POPUP (discreet: reached via the 📎 by the footer) -->
+<div class="org-overlay" id="organizeModal">
+  <div class="org-modal">
+    <div class="org-head">
+      <span class="org-title">📎 Organize Groups &amp; Subgroups</span>
+      <button class="org-x" onclick="closeOrganize()" title="Close">&times;</button>
+    </div>
+    <div class="org-status" id="orgStatus"></div>
+    <div class="org-body" id="organizeBody"></div>
+    <div class="org-foot">
+      <button class="org-pub" onclick="publishLayout()">📤 Publish to all</button>
+      <button class="org-done" onclick="closeOrganize()">✓ Done</button>
+    </div>
+  </div>
 </div>
 
 <header>
@@ -1267,7 +1300,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-04-1124';
+const APP_VERSION = '2026-09-04-1340';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1665,7 +1698,7 @@ function toggleGroup(name) {
   try { localStorage.setItem('pcc_collapsedGroups', JSON.stringify(Array.from(collapsedGroups))); } catch(e) {}
   renderCcChooser();
 }
-function ccCardHtml(id) {
+function ccCardHtml(id, organize) {
   const cc = cycleCounts[id];
   let binN = 0;
   Object.entries(cc.items || {}).forEach(([num, it]) => binN += visibleBins(num, it, id).length);
@@ -1687,7 +1720,7 @@ function ccCardHtml(id) {
     <div class="ccc-name">${esc(cc.name || cc.id)}</div>
     <div class="ccc-stats">${itemN} items · ${progStr}${finalized}</div>
     ${lcLine}`;
-  if (organizeMode) {
+  if (organize) {
     // Organize mode: card is a draggable tile with a "Move to" picker (tap-friendly). No pick action.
     const dept = groupOf(id);
     const opts = ['<option value="">— Ungrouped —</option>']
@@ -1706,14 +1739,52 @@ function ccCardHtml(id) {
 // ── SUBGROUPS (organize the counts within a department) ──
 function deptSubgroups(dept) { return Array.isArray(subgroupNames[dept]) ? subgroupNames[dept] : []; }
 function subgroupOf(id) { const s = subgroups[id]; return (s && deptSubgroups(groupOf(id)).indexOf(s) >= 0) ? s : ''; }
-function toggleOrganize() { organizeMode = !organizeMode; renderCcChooser(); }
+function openOrganize() {
+  const ov = document.getElementById('organizeModal');
+  if (ov) ov.classList.add('show');
+  renderOrganizeModal();
+}
+function closeOrganize() {
+  const ov = document.getElementById('organizeModal');
+  if (ov) ov.classList.remove('show');
+  renderCcChooser(); // reflect changes in the chooser underneath
+}
+// Re-render whichever organize surface is showing (the popup if open, else the chooser).
+function refreshOrganizeUI() {
+  const ov = document.getElementById('organizeModal');
+  if (ov && ov.classList.contains('show')) renderOrganizeModal(); else renderCcChooser();
+}
+function renderOrganizeModal() {
+  const body = document.getElementById('organizeBody');
+  const st = document.getElementById('orgStatus');
+  if (!body) return;
+  if (st) st.innerHTML = layoutDirty
+    ? '<b style="color:var(--gold)">● Unpublished changes.</b> Tap <b>Publish to all</b> so every device gets this layout on next Sync. &nbsp;<a href="#" onclick="event.preventDefault();discardLayoutChanges()">↺ discard</a>'
+    : '<b style="color:var(--green)">✓ Shared with all devices.</b> Drag a count (or use its ▾ picker) into a subgroup; add / rename / delete subgroups per department.';
+  const ids = Object.keys(cycleCounts);
+  const GROUP_ORDER = ['Printing', 'Routing', 'Finishing', 'Asset Management'];
+  const groups = {};
+  ids.forEach(id => { const g = groupOf(id); (groups[g] = groups[g] || []).push(id); });
+  const gnames = Object.keys(groups).sort((a, b) => {
+    const ia = GROUP_ORDER.indexOf(a), ib = GROUP_ORDER.indexOf(b);
+    if (ia < 0 && ib < 0) return a.localeCompare(b);
+    if (ia < 0) return 1; if (ib < 0) return -1; return ia - ib;
+  });
+  let html = '';
+  gnames.forEach(g => {
+    const gids = groups[g].sort((a, b) => String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
+    html += `<div class="org-dept"><div class="org-dept-head">${esc(g)} <span class="ccc-group-count">${gids.length}</span></div>` +
+      renderDeptBody(g, gids, true) + '</div>';
+  });
+  body.innerHTML = html;
+}
 function addSubgroup(dept) {
   const n = prompt('New subgroup name for ' + dept + ':');
   if (n === null) return;
   const nm = n.trim(); if (!nm) return;
   if (!Array.isArray(subgroupNames[dept])) subgroupNames[dept] = [];
   if (subgroupNames[dept].indexOf(nm) < 0) subgroupNames[dept].push(nm);
-  layoutDirty = true; persist(); renderCcChooser();
+  layoutDirty = true; persist(); refreshOrganizeUI();
 }
 function renameSubgroup(dept, oldName) {
   const n = prompt('Rename subgroup:', oldName);
@@ -1722,18 +1793,18 @@ function renameSubgroup(dept, oldName) {
   const arr = subgroupNames[dept] || []; const i = arr.indexOf(oldName);
   if (i >= 0) arr[i] = nm;
   Object.keys(subgroups).forEach(id => { if (subgroups[id] === oldName && groupOf(id) === dept) subgroups[id] = nm; });
-  layoutDirty = true; persist(); renderCcChooser();
+  layoutDirty = true; persist(); refreshOrganizeUI();
 }
 function deleteSubgroup(dept, name) {
   if (!confirm('Delete subgroup "' + name + '"?\n\nIts counts move back to Ungrouped (the counts themselves are not deleted).')) return;
   const arr = subgroupNames[dept] || []; const i = arr.indexOf(name);
   if (i >= 0) arr.splice(i, 1);
   Object.keys(subgroups).forEach(id => { if (subgroups[id] === name && groupOf(id) === dept) delete subgroups[id]; });
-  layoutDirty = true; persist(); renderCcChooser();
+  layoutDirty = true; persist(); refreshOrganizeUI();
 }
 function moveCcToSubgroup(id, name) {
   if (name && deptSubgroups(groupOf(id)).indexOf(name) >= 0) subgroups[id] = name; else delete subgroups[id];
-  layoutDirty = true; persist(); renderCcChooser();
+  layoutDirty = true; persist(); refreshOrganizeUI();
 }
 function onCcDragStart(ev, id) { dragCcId = id; try { ev.dataTransfer.setData('text/plain', id); ev.dataTransfer.effectAllowed = 'move'; } catch(e) {} }
 function onSubDragOver(ev) { ev.preventDefault(); try { ev.dataTransfer.dropEffect = 'move'; } catch(e) {} ev.currentTarget.classList.add('drop-hot'); }
@@ -1747,15 +1818,15 @@ function onSubDrop(ev, dept, name) {
   moveCcToSubgroup(id, name);
 }
 // Render a department's counts — flat, or split into subgroups + Ungrouped (and edit controls in organize mode).
-function renderDeptBody(dept, gids) {
+function renderDeptBody(dept, gids, organize) {
   const subs = deptSubgroups(dept);
-  if (!subs.length && !organizeMode) return gids.map(id => ccCardHtml(id)).join('');
+  if (!subs.length && !organize) return gids.map(id => ccCardHtml(id, false)).join('');
   const dsafe = esc(dept).replace(/'/g, "\\'");
   const zone = (name, ids) => {
     const nsafe = esc(name).replace(/'/g, "\\'");
     return `<div class="ccc-subzone" ondragover="onSubDragOver(event)" ondragleave="onSubDragLeave(event)" ondrop="onSubDrop(event,'${dsafe}','${nsafe}')">` +
-      ids.map(id => ccCardHtml(id)).join('') +
-      (organizeMode && !ids.length ? '<div class="ccc-empty">drop counts here</div>' : '') + '</div>';
+      ids.map(id => ccCardHtml(id, organize)).join('') +
+      (organize && !ids.length ? '<div class="ccc-empty">drop counts here</div>' : '') + '</div>';
   };
   let html = '';
   subs.forEach(name => {
@@ -1763,15 +1834,15 @@ function renderDeptBody(dept, gids) {
       .sort((a, b) => String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
     const nsafe = esc(name).replace(/'/g, "\\'");
     html += `<div class="ccc-subhead"><span class="ccc-subname">${esc(name)}</span><span class="ccc-subcount">${sgids.length}</span>` +
-      (organizeMode ? `<span class="ccc-subedit"><button onclick="renameSubgroup('${dsafe}','${nsafe}')" title="Rename">✏️</button><button onclick="deleteSubgroup('${dsafe}','${nsafe}')" title="Delete">✕</button></span>` : '') +
+      (organize ? `<span class="ccc-subedit"><button onclick="renameSubgroup('${dsafe}','${nsafe}')" title="Rename">✏️</button><button onclick="deleteSubgroup('${dsafe}','${nsafe}')" title="Delete">✕</button></span>` : '') +
       `</div>` + zone(name, sgids);
   });
   const ung = gids.filter(id => !subgroupOf(id))
     .sort((a, b) => String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
-  if (ung.length || organizeMode) {
+  if (ung.length || organize) {
     html += `<div class="ccc-subhead ccc-subhead-ung"><span class="ccc-subname">Ungrouped</span><span class="ccc-subcount">${ung.length}</span></div>` + zone('', ung);
   }
-  if (organizeMode) html += `<button class="ccc-addsub" onclick="addSubgroup('${dsafe}')">＋ Add subgroup</button>`;
+  if (organize) html += `<button class="ccc-addsub" onclick="addSubgroup('${dsafe}')">＋ Add subgroup</button>`;
   return html;
 }
 function renderCcChooser() {
@@ -1786,34 +1857,22 @@ function renderCcChooser() {
     list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No cycle counts available. Use the Setup tab to import.</div>';
     return;
   }
-  let html = '<div class="ccc-organize-bar">' +
-    (organizeMode ? '<button class="ccc-organize-btn pub" onclick="publishLayout()">📤 Publish to all devices</button>' : '') +
-    '<button class="ccc-organize-btn' + (organizeMode ? ' on' : '') + '" onclick="toggleOrganize()">' +
-    (organizeMode ? '✓ Done' : '✏️ Organize into groups') + '</button></div>';
-  if (organizeMode) {
-    html += '<div class="ccc-organize-hint">' +
-      (layoutDirty
-        ? '<b style="color:#c47b00">● Unpublished changes on this device.</b> Tap <b>Publish to all devices</b> so every computer/phone gets this layout on their next Sync. '
-        : '<b style="color:#0a7">✓ This layout matches what\'s shared.</b> ') +
-      'Drag a count (or use its ▾ picker) into a subgroup; add / rename / delete subgroups per department.' +
-      (layoutDirty ? ' &nbsp;·&nbsp; <a href="#" onclick="event.preventDefault();discardLayoutChanges()">↺ discard my changes</a>' : '') +
-      '</div>';
-  }
+  let html = '';
   // In-progress counts (started, not finalized) — pinned at the TOP so a counter can immediately
-  // continue the count they're on. Hidden in organize mode (they show in their department there).
+  // continue the count they're on, even with every section collapsed.
   const inProg = Object.keys(counts)
     .filter(id => (counts[id] || []).length > 0 && cycleCounts[id] && !cycleCounts[id].finalizedAt)
     .sort((a, b) => String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
   const inProgSet = new Set(inProg);
-  if (inProg.length && !organizeMode) {
+  if (inProg.length) {
     html += '<div class="ccc-group"><div class="ccc-group-head ccc-inprog">' +
       '<span>▾ CONTINUE COUNTING</span><span class="ccc-group-count">' + inProg.length + '</span></div>' +
-      inProg.map(id => ccCardHtml(id)).join('') + '</div>';
+      inProg.map(id => ccCardHtml(id, false)).join('') + '</div>';
   }
-  // Bucket the REST by section (in-progress ones are shown above unless organizing).
+  // Bucket the REST by section (in-progress ones are shown above, not duplicated here).
   const GROUP_ORDER = ['Printing', 'Routing', 'Finishing', 'Asset Management'];
   const groups = {};
-  ids.forEach(id => { if (!organizeMode && inProgSet.has(id)) return; const g = groupOf(id); (groups[g] = groups[g] || []).push(id); });
+  ids.forEach(id => { if (inProgSet.has(id)) return; const g = groupOf(id); (groups[g] = groups[g] || []).push(id); });
   const gnames = Object.keys(groups).sort((a, b) => {
     const ia = GROUP_ORDER.indexOf(a), ib = GROUP_ORDER.indexOf(b);
     if (ia < 0 && ib < 0) return a.localeCompare(b);
@@ -1824,12 +1883,12 @@ function renderCcChooser() {
   gnames.forEach(g => {
     const gids = groups[g].sort((a, b) =>
       String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
-    const collapsed = organizeMode ? false : collapsedGroups.has(g); // always expanded while organizing
+    const collapsed = collapsedGroups.has(g);
     const gsafe = esc(g).replace(/'/g, "\\'");
     html += `<div class="ccc-group"><button class="ccc-group-head" onclick="toggleGroup('${gsafe}')">` +
             `<span>${collapsed ? '▸' : '▾'} ${esc(g)}</span>` +
             `<span class="ccc-group-count">${gids.length}</span></button>`;
-    if (!collapsed) html += renderDeptBody(g, gids);
+    if (!collapsed) html += renderDeptBody(g, gids, false);
     html += `</div>`;
   });
   list.innerHTML = html;
@@ -3766,7 +3825,7 @@ async function publishLayout() {
       else showToast('Publish failed: HTTP ' + res.status, 'err');
       return;
     }
-    layoutDirty = false; persist(); renderCcChooser();
+    layoutDirty = false; persist(); refreshOrganizeUI();
     showToast('Layout published — other devices get it on next Sync ✓');
   } catch(e) { showToast('Publish failed (network)', 'err'); }
 }
@@ -3775,7 +3834,7 @@ async function discardLayoutChanges() {
   if (!confirm('Discard this device\'s layout changes and use the shared (published) layout instead?')) return;
   layoutDirty = false; persist();
   await fetchSharedLayout(true);
-  renderCcChooser();
+  refreshOrganizeUI();
   showToast('Using the shared layout');
 }
 
