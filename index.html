@@ -614,7 +614,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 <div class="tabs">
   <div class="tab active" onclick="switchTab('count')">📋 Count</div>
   <div class="tab" onclick="switchTab('history')">🕓 History</div>
-  <div class="tab" onclick="switchTab('export')">📤 Export</div>
+  <div class="tab" onclick="switchTab('export')">✅ Finished</div>
   <div class="tab" onclick="switchTab('labels')">🏷 Labels</div>
   <div class="tab" onclick="switchTab('calc')">📐 Calc</div>
   <div class="tab" onclick="switchTab('setup')">⚙️ Setup</div>
@@ -932,7 +932,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
         <li>If the item has one row, the keypad opens automatically. If multiple rows, tap the one you're at.</li>
         <li>Type the quantity on the keypad, tap <strong>✔ LOG</strong>.</li>
         <li>Continue until all rows are counted. The header pill shows <strong>X/Y</strong> progress.</li>
-        <li>When done, go to <strong>📤 Export</strong> tab → tap <strong>Copy Current CSV</strong> → open your email app, paste it into a message to the manager, and send.</li>
+        <li>When done, go to the <strong>✅ Finished Counting</strong> tab and follow the steps there — review the variance report, fix any issues, then send the count to the manager.</li>
       </ol>
     </div>
   </div>
@@ -1245,7 +1245,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-04-0727';
+const APP_VERSION = '2026-09-04-0733';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
