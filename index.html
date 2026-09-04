@@ -1245,7 +1245,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-04-0733';
+const APP_VERSION = '2026-09-04-0741';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3371,6 +3371,12 @@ const DATA_STAMP_URL = 'https://gist.githubusercontent.com/endlessedge1997/dd6dd
 let latestVersion = null;
 let appOutdated = false;   // true when a newer app build is available
 
+// Clear the variance paste boxes on every load / back-forward restore so browsers never
+// restore stale pasted text into them (the manager kept seeing old CSV text on open).
+window.addEventListener('pageshow', function() {
+  ['reportCsv', 'counterReviewCsv'].forEach(function(id) { const e = document.getElementById(id); if (e) e.value = ''; });
+});
+
 // Short date/time like "6/10 2:55p".
 function fmtStamp(iso) {
   if (!iso) return null;
@@ -3721,11 +3727,25 @@ function finalizeAllAssets() {
 // Current system on-hand for a counted row, read from the LATEST synced data (not the value
 // frozen on the count entry). Lets the variance recompute after a Pace fix + fresh sync,
 // without re-counting. Returns null if the item/bin no longer exists (caller falls back).
+function normKey(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toUpperCase(); }
 function currentOhFor(ccId, itemNum, bin, lot) {
   const cc = cycleCounts[ccId];
-  if (!cc || !cc.items || !cc.items[itemNum]) return null;
-  const m = mergedBins(itemNum, cc.items[itemNum], ccId)
-    .find(b => b.bin === bin && (b.lot || '') === (lot || ''));
+  if (!cc || !cc.items) return null;
+  // Tolerant item lookup (trim/case) — pasted CSV item # vs stored key.
+  let it = cc.items[itemNum];
+  if (!it) {
+    const k = Object.keys(cc.items).find(x => normKey(x) === normKey(itemNum));
+    if (k) it = cc.items[k];
+  }
+  if (!it) return null;
+  const nb = normKey(bin), nl = normKey(lot);
+  const bins = mergedBins(itemNum, it, ccId);
+  // 1) exact-ish match on bin + lot (whitespace/case tolerant)
+  let m = bins.find(b => normKey(b.bin) === nb && normKey(b.lot) === nl);
+  // 2) if no lot on the pasted row, match on bin alone
+  if (!m && !nl) m = bins.find(b => normKey(b.bin) === nb);
+  // 3) last resort: if the item has exactly ONE bin, use it (item clearly matched, bin label drifted)
+  if (!m && bins.length === 1) m = bins[0];
   return m ? (parseFloat(m.oh) || 0) : null;
 }
 // On-hand to USE for a count row: current synced value if available, else the frozen snapshot.
@@ -4249,7 +4269,7 @@ function varianceCsvHtml(rawInput) {
   const liveEl = document.getElementById('useLiveOh');
   const useLive = liveEl ? liveEl.checked : true;
   const data = [];
-  let ccId = '', operator = '', countDate = '', changed = 0;
+  let ccId = '', operator = '', countDate = '', changed = 0, matched = 0;
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (row.length === 1 && !row[0]) continue;
@@ -4266,7 +4286,7 @@ function varianceCsvHtml(rawInput) {
       const rowCC = iCC >= 0 ? String(row[iCC] || '').trim() : ccId;
       const lotId = iLotId >= 0 ? String(row[iLotId] || '').trim() : '';
       const cur = currentOhFor(rowCC, item, binVal, lotId);
-      if (cur !== null) { oh = cur; if (Math.abs(cur - csvOh) > 0.0001) { was = csvOh; changed++; } }
+      if (cur !== null) { matched++; oh = cur; if (Math.abs(cur - csvOh) > 0.0001) { was = csvOh; changed++; } }
     }
     data.push({
       item,
@@ -4321,9 +4341,13 @@ function varianceCsvHtml(rawInput) {
       '<h1>Cycle Count Variance Report</h1>' +
       '<div class="sub">CC ' + esc(ccId) + (ccName ? ' — ' + esc(ccName) : '') + '</div>' +
       '<div class="meta">Counted by ' + esc(operator || '—') + (countDate ? ' · Count date ' + esc(countDate) : '') + ' · Printed ' + new Date().toLocaleString() + ' · ' + data.length + ' rows · ' + varCount + ' with variance</div>' +
-      '<div class="meta">On-hand: ' + (useLive
-        ? ('<b>your device\'s current synced Pace data</b>' + (changed ? ' · <b style="color:#c47b00">' + changed + ' row' + (changed === 1 ? '' : 's') + ' differ from the pasted CSV (see "was") — tap Sync first if numbers look old</b>' : ' (matches the pasted CSV)'))
-        : 'the values in the pasted CSV') + '</div>' +
+      '<div class="meta">' + (useLive
+        ? ('On-hand = <b>this device\'s synced Pace data</b>' + (fmtStamp(getDataStamp()) ? ' as of <b>' + esc(fmtStamp(getDataStamp())) + '</b>' : '') +
+           ' · matched <b>' + matched + '</b> of ' + data.length + ' rows' +
+           (changed ? ' · <b style="color:#c47b00">' + changed + ' updated (see "was")</b>' : '') +
+           ((data.length - matched) > 0 ? ' · <b style="color:#c00">' + (data.length - matched) + ' NOT matched → showing pasted value</b>' : ''))
+        : 'On-hand = the values in the <b>pasted CSV</b> (live recompute is OFF)') + '</div>' +
+      (useLive ? '<div class="meta" style="color:#a00">Numbers look old? On a computer run <b>Setup &rarr; A. Push fresh Pace data</b> (scrape + upload), then <b>Sync</b> here — plain Sync only re-pulls the last push.</div>' : '') +
     '</div>' +
     '<table><thead><tr>' +
       '<th>Item #</th><th>Description</th><th>Bin / Location</th><th>Lot</th>' +
