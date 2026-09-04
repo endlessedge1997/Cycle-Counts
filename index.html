@@ -94,6 +94,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
 .ccc-group-head{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:var(--text);font-family:var(--head);font-weight:700;font-size:15px;letter-spacing:1px;text-transform:uppercase}
 .ccc-group-head:active{background:var(--surface2)}
 .ccc-group-head.ccc-inprog{background:rgba(39,201,122,.16);border-color:var(--green);cursor:default}
+/* Organize-into-subgroups UI */
+.ccc-organize-bar{width:100%;max-width:480px;display:flex;justify-content:flex-end;margin-bottom:10px}
+.ccc-organize-btn{font-family:var(--sans);font-size:12.5px;font-weight:700;padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);cursor:pointer}
+.ccc-organize-btn.on{background:rgba(39,201,122,.2);border-color:var(--green)}
+.ccc-organize-hint{width:100%;max-width:480px;font-family:var(--sans);font-size:12px;color:var(--text);line-height:1.4;margin-bottom:10px;background:rgba(0,198,255,.08);border:1px solid var(--border);border-radius:8px;padding:9px 11px}
+.ccc-subhead{width:100%;max-width:480px;display:flex;align-items:center;gap:8px;margin:10px 0 5px;font-family:var(--head);font-weight:700;font-size:13px;letter-spacing:.5px;text-transform:uppercase;color:var(--text)}
+.ccc-subhead-ung{opacity:.7}
+.ccc-subcount{font-family:var(--sans);font-size:11px;font-weight:700;background:var(--surface2);border-radius:10px;padding:1px 8px}
+.ccc-subedit{margin-left:auto;display:flex;gap:5px}
+.ccc-subedit button{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
+.ccc-subzone{width:100%;max-width:480px;display:flex;flex-direction:column;gap:7px;min-height:8px;border-radius:10px;padding:2px}
+.ccc-subzone.drop-hot{background:rgba(0,198,255,.12);outline:2px dashed var(--accent);outline-offset:-2px}
+.ccc-empty{font-family:var(--sans);font-size:12px;color:var(--muted);text-align:center;padding:12px;border:1px dashed var(--border);border-radius:8px}
+.ccc-addsub{width:100%;max-width:480px;font-family:var(--sans);font-size:12.5px;font-weight:700;padding:10px;margin-top:8px;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--text);cursor:pointer}
+.ccc-card.ccc-drag{cursor:grab}
+.ccc-draghandle{font-family:var(--sans);font-size:11px;color:var(--muted);margin-bottom:4px}
+.ccc-move{width:100%;margin-top:8px;padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;font-weight:600}
 .ccc-group-count{font-family:var(--mono);font-size:12px;color:var(--gold);background:var(--surface2);border-radius:10px;padding:2px 8px;letter-spacing:1px}
 .ccc-last{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:.3px}
 
@@ -1248,7 +1265,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-04-1103';
+const APP_VERSION = '2026-09-04-1108';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -1291,6 +1308,10 @@ const DEPT_EMAIL = {
 let checklistOpen = null;  // null = auto (open when month-end is near AND work is outstanding)
 let exportSel = new Set(); // ccIds checked on the Export "Send to Manager" screen
 let exportSelInit = false;  // have we applied the default selection (all complete counts) yet?
+let subgroups = {};         // { ccId: subgroupName } — user organization WITHIN a department
+let subgroupNames = {};     // { department: [ordered subgroup names] }
+let organizeMode = false;   // chooser edit mode: add/rename/delete subgroups + move counts (not persisted)
+let dragCcId = null;        // ccId being dragged
 let pendingImport = null;
 let npCurrent = '0';
 let entryCtx = null;
@@ -1328,6 +1349,8 @@ const FONT_ELEMENTS = [
   if (operator === 'Printing') operator = '';
   try { roster       = JSON.parse(localStorage.getItem('pcc_roster') || '[]'); } catch(e) { roster = []; }
   if (!Array.isArray(roster)) roster = [];
+  try { subgroups     = JSON.parse(localStorage.getItem('pcc_subgroups') || '{}'); } catch(e) { subgroups = {}; }
+  try { subgroupNames = JSON.parse(localStorage.getItem('pcc_subgroupNames') || '{}'); } catch(e) { subgroupNames = {}; }
   // Master list always shows first; keep any extra names typed on this device after it.
   roster = ROSTER_SEED.concat(roster.filter(n => n && n !== 'Printing' && ROSTER_SEED.indexOf(n) < 0));
   // Make sure the current name is always in the picker list.
@@ -1391,6 +1414,8 @@ function persist() {
     localStorage.setItem('pcc_addedBins',    JSON.stringify(addedBins));
     localStorage.setItem('pcc_activeCC',     activeCC || '');
     localStorage.setItem('pcc_roster',       JSON.stringify(roster));
+    localStorage.setItem('pcc_subgroups',    JSON.stringify(subgroups));
+    localStorage.setItem('pcc_subgroupNames',JSON.stringify(subgroupNames));
     if (operator) localStorage.setItem('pcc_op', operator);
   } catch(e) {}
 }
@@ -1653,12 +1678,96 @@ function ccCardHtml(id) {
   } else {
     lcLine = `<div class="ccc-last">🕓 Last count: never</div>`;
   }
-  return `<button class="ccc-card${id === activeCC ? ' active' : ''}" onclick="pickCC('${escId}')">
-    <div class="ccc-id">CC ${esc(id)}</div>
+  const inner = `<div class="ccc-id">CC ${esc(id)}</div>
     <div class="ccc-name">${esc(cc.name || cc.id)}</div>
     <div class="ccc-stats">${itemN} items · ${progStr}${finalized}</div>
-    ${lcLine}
+    ${lcLine}`;
+  if (organizeMode) {
+    // Organize mode: card is a draggable tile with a "Move to" picker (tap-friendly). No pick action.
+    const dept = groupOf(id);
+    const opts = ['<option value="">— Ungrouped —</option>']
+      .concat(deptSubgroups(dept).map(n => `<option value="${esc(n)}"${subgroupOf(id) === n ? ' selected' : ''}>${esc(n)}</option>`))
+      .join('');
+    return `<div class="ccc-card ccc-drag" draggable="true" ondragstart="onCcDragStart(event,'${escId}')" ondragend="dragCcId=null">
+      <div class="ccc-draghandle">⠿ drag or pick a group ▾</div>
+      ${inner}
+      <select class="ccc-move" onchange="moveCcToSubgroup('${escId}', this.value)" onclick="event.stopPropagation()">${opts}</select>
+    </div>`;
+  }
+  return `<button class="ccc-card${id === activeCC ? ' active' : ''}" onclick="pickCC('${escId}')">
+    ${inner}
   </button>`;
+}
+// ── SUBGROUPS (organize the counts within a department) ──
+function deptSubgroups(dept) { return Array.isArray(subgroupNames[dept]) ? subgroupNames[dept] : []; }
+function subgroupOf(id) { const s = subgroups[id]; return (s && deptSubgroups(groupOf(id)).indexOf(s) >= 0) ? s : ''; }
+function toggleOrganize() { organizeMode = !organizeMode; renderCcChooser(); }
+function addSubgroup(dept) {
+  const n = prompt('New subgroup name for ' + dept + ':');
+  if (n === null) return;
+  const nm = n.trim(); if (!nm) return;
+  if (!Array.isArray(subgroupNames[dept])) subgroupNames[dept] = [];
+  if (subgroupNames[dept].indexOf(nm) < 0) subgroupNames[dept].push(nm);
+  persist(); renderCcChooser();
+}
+function renameSubgroup(dept, oldName) {
+  const n = prompt('Rename subgroup:', oldName);
+  if (n === null) return;
+  const nm = n.trim(); if (!nm || nm === oldName) return;
+  const arr = subgroupNames[dept] || []; const i = arr.indexOf(oldName);
+  if (i >= 0) arr[i] = nm;
+  Object.keys(subgroups).forEach(id => { if (subgroups[id] === oldName && groupOf(id) === dept) subgroups[id] = nm; });
+  persist(); renderCcChooser();
+}
+function deleteSubgroup(dept, name) {
+  if (!confirm('Delete subgroup "' + name + '"?\n\nIts counts move back to Ungrouped (the counts themselves are not deleted).')) return;
+  const arr = subgroupNames[dept] || []; const i = arr.indexOf(name);
+  if (i >= 0) arr.splice(i, 1);
+  Object.keys(subgroups).forEach(id => { if (subgroups[id] === name && groupOf(id) === dept) delete subgroups[id]; });
+  persist(); renderCcChooser();
+}
+function moveCcToSubgroup(id, name) {
+  if (name && deptSubgroups(groupOf(id)).indexOf(name) >= 0) subgroups[id] = name; else delete subgroups[id];
+  persist(); renderCcChooser();
+}
+function onCcDragStart(ev, id) { dragCcId = id; try { ev.dataTransfer.setData('text/plain', id); ev.dataTransfer.effectAllowed = 'move'; } catch(e) {} }
+function onSubDragOver(ev) { ev.preventDefault(); try { ev.dataTransfer.dropEffect = 'move'; } catch(e) {} ev.currentTarget.classList.add('drop-hot'); }
+function onSubDragLeave(ev) { ev.currentTarget.classList.remove('drop-hot'); }
+function onSubDrop(ev, dept, name) {
+  ev.preventDefault(); ev.currentTarget.classList.remove('drop-hot');
+  let id = dragCcId; try { id = ev.dataTransfer.getData('text/plain') || dragCcId; } catch(e) {}
+  dragCcId = null;
+  if (!id) return;
+  if (groupOf(id) !== dept) { showToast('Move within the same department', 'err'); return; }
+  moveCcToSubgroup(id, name);
+}
+// Render a department's counts — flat, or split into subgroups + Ungrouped (and edit controls in organize mode).
+function renderDeptBody(dept, gids) {
+  const subs = deptSubgroups(dept);
+  if (!subs.length && !organizeMode) return gids.map(id => ccCardHtml(id)).join('');
+  const dsafe = esc(dept).replace(/'/g, "\\'");
+  const zone = (name, ids) => {
+    const nsafe = esc(name).replace(/'/g, "\\'");
+    return `<div class="ccc-subzone" ondragover="onSubDragOver(event)" ondragleave="onSubDragLeave(event)" ondrop="onSubDrop(event,'${dsafe}','${nsafe}')">` +
+      ids.map(id => ccCardHtml(id)).join('') +
+      (organizeMode && !ids.length ? '<div class="ccc-empty">drop counts here</div>' : '') + '</div>';
+  };
+  let html = '';
+  subs.forEach(name => {
+    const sgids = gids.filter(id => subgroupOf(id) === name)
+      .sort((a, b) => String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
+    const nsafe = esc(name).replace(/'/g, "\\'");
+    html += `<div class="ccc-subhead"><span class="ccc-subname">${esc(name)}</span><span class="ccc-subcount">${sgids.length}</span>` +
+      (organizeMode ? `<span class="ccc-subedit"><button onclick="renameSubgroup('${dsafe}','${nsafe}')" title="Rename">✏️</button><button onclick="deleteSubgroup('${dsafe}','${nsafe}')" title="Delete">✕</button></span>` : '') +
+      `</div>` + zone(name, sgids);
+  });
+  const ung = gids.filter(id => !subgroupOf(id))
+    .sort((a, b) => String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
+  if (ung.length || organizeMode) {
+    html += `<div class="ccc-subhead ccc-subhead-ung"><span class="ccc-subname">Ungrouped</span><span class="ccc-subcount">${ung.length}</span></div>` + zone('', ung);
+  }
+  if (organizeMode) html += `<button class="ccc-addsub" onclick="addSubgroup('${dsafe}')">＋ Add subgroup</button>`;
+  return html;
 }
 function renderCcChooser() {
   renderMonthChecklist();
@@ -1672,22 +1781,24 @@ function renderCcChooser() {
     list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No cycle counts available. Use the Setup tab to import.</div>';
     return;
   }
-  let html = '';
-  // In-progress counts (started, not finalized) — pinned at the TOP, always expanded, so a counter
-  // can immediately find and continue the count they're on even when all groups are collapsed.
+  let html = '<div class="ccc-organize-bar"><button class="ccc-organize-btn' + (organizeMode ? ' on' : '') +
+    '" onclick="toggleOrganize()">' + (organizeMode ? '✓ Done organizing' : '✏️ Organize into groups') + '</button></div>';
+  if (organizeMode) html += '<div class="ccc-organize-hint">Drag a count (or use its ▾ picker) into a subgroup. Add / rename / delete subgroups per department. Changes save automatically.</div>';
+  // In-progress counts (started, not finalized) — pinned at the TOP so a counter can immediately
+  // continue the count they're on. Hidden in organize mode (they show in their department there).
   const inProg = Object.keys(counts)
     .filter(id => (counts[id] || []).length > 0 && cycleCounts[id] && !cycleCounts[id].finalizedAt)
     .sort((a, b) => String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
   const inProgSet = new Set(inProg);
-  if (inProg.length) {
+  if (inProg.length && !organizeMode) {
     html += '<div class="ccc-group"><div class="ccc-group-head ccc-inprog">' +
       '<span>▾ CONTINUE COUNTING</span><span class="ccc-group-count">' + inProg.length + '</span></div>' +
       inProg.map(id => ccCardHtml(id)).join('') + '</div>';
   }
-  // Bucket the REST by section (in-progress ones are shown above, not duplicated here).
+  // Bucket the REST by section (in-progress ones are shown above unless organizing).
   const GROUP_ORDER = ['Printing', 'Routing', 'Finishing', 'Asset Management'];
   const groups = {};
-  ids.forEach(id => { if (inProgSet.has(id)) return; const g = groupOf(id); (groups[g] = groups[g] || []).push(id); });
+  ids.forEach(id => { if (!organizeMode && inProgSet.has(id)) return; const g = groupOf(id); (groups[g] = groups[g] || []).push(id); });
   const gnames = Object.keys(groups).sort((a, b) => {
     const ia = GROUP_ORDER.indexOf(a), ib = GROUP_ORDER.indexOf(b);
     if (ia < 0 && ib < 0) return a.localeCompare(b);
@@ -1698,12 +1809,12 @@ function renderCcChooser() {
   gnames.forEach(g => {
     const gids = groups[g].sort((a, b) =>
       String(cycleCounts[a].name || a).localeCompare(String(cycleCounts[b].name || b), undefined, { numeric: true }));
-    const collapsed = collapsedGroups.has(g);
+    const collapsed = organizeMode ? false : collapsedGroups.has(g); // always expanded while organizing
     const gsafe = esc(g).replace(/'/g, "\\'");
     html += `<div class="ccc-group"><button class="ccc-group-head" onclick="toggleGroup('${gsafe}')">` +
             `<span>${collapsed ? '▸' : '▾'} ${esc(g)}</span>` +
             `<span class="ccc-group-count">${gids.length}</span></button>`;
-    if (!collapsed) html += gids.map(id => ccCardHtml(id)).join('');
+    if (!collapsed) html += renderDeptBody(g, gids);
     html += `</div>`;
   });
   list.innerHTML = html;
