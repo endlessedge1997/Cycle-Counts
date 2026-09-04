@@ -1038,7 +1038,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
     <button class="acc-head" onclick="toggleAcc(this)"><span>🖨 C. Print variance report</span><span class="acc-chevron">▾</span></button>
     <div class="acc-body">
       <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">
-        Paste the <strong>same CSV</strong> the counter sent you. This prints a report showing, per location: what the <strong>system had before</strong> (Pace on-hand), what was <strong>counted</strong>, and the <strong>variance</strong> — with the cycle count name and date.
+        Paste the count the counter sent you — you can just <strong>Select&nbsp;All</strong> in the email and paste the whole thing (it finds the count and ignores the rest). Prints a report showing, per location: <strong>system on-hand</strong> vs <strong>counted</strong> and the <strong>variance</strong>.
       </p>
       <textarea id="reportCsv" placeholder='Paste the counter&apos;s CSV here — starts with "Cycle Count","Item Number",…' style="width:100%;min-height:90px;max-height:40vh;resize:vertical;font-family:var(--code);font-size:12px;line-height:1.45;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);margin-bottom:10px"></textarea>
       <label style="display:flex;align-items:flex-start;gap:8px;padding:9px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;cursor:pointer;font-size:12px;line-height:1.4">
@@ -1245,7 +1245,7 @@ summary.ex-title{font-family:var(--head);font-weight:700;font-size:15px;color:va
 
 <script>
 // APP_VERSION is auto-stamped by _deploy.ps1 on every deploy. Do not edit by hand.
-const APP_VERSION = '2026-09-04-0741';
+const APP_VERSION = '2026-09-04-0753';
 const FALLBACK_OPERATORS = ['Clint','Chance','Rob','Josh','Austin'];
 
 // Printing Cycle Count Scanner — starts empty. Import a CSV from the Setup tab.
@@ -3085,14 +3085,16 @@ const F12_FILL_SCRIPT = "(function(){\n" +
 "    }\n" +
 "    var rows = parseCsv(csvText);\n" +
 "    if (rows.length<2){ resEl.textContent = 'CSV looks empty (less than 2 rows parsed).'; return; }\n" +
-"    var header = rows[0].map(function(h){ return String(h||'').trim().toLowerCase(); });\n" +
+"    var hdr = 0;\n" +
+"    for (var hh=0; hh<rows.length; hh++){ var jl=rows[hh].join(',').toLowerCase(); if (jl.indexOf('item number')>=0 && jl.indexOf('count qty')>=0){ hdr=hh; break; } }\n" +
+"    var header = rows[hdr].map(function(h){ return String(h||'').trim().toLowerCase(); });\n" +
 "    var idxItem = header.indexOf('item number');\n" +
 "    var idxBin  = header.indexOf('bin');\n" +
 "    var idxLot  = header.indexOf('lot id');\n" +
 "    var idxQty  = header.indexOf('count qty');\n" +
 "    if (idxItem<0||idxBin<0||idxQty<0){ resEl.textContent = 'Missing required columns. Headers found: '+header.join(', '); return; }\n" +
 "    var lookup = {};\n" +
-"    for (var r=1; r<rows.length; r++){\n" +
+"    for (var r=hdr+1; r<rows.length; r++){\n" +
 "      var row = rows[r];\n" +
 "      var itemNum = String(row[idxItem]||'').trim();\n" +
 "      var binCombo = String(row[idxBin]||'').trim();\n" +
@@ -4246,12 +4248,31 @@ function fallbackEmailHtml(html, fname, subject) {
 // VARIANCE REPORT (manager) ────────────────────────────
 // Builds a printable report from the counter's pasted CSV: system on-hand (before) vs
 // counted vs variance, with the cycle count name and date. Everything comes from the CSV.
+// Pull the actual count CSV out of ANYTHING pasted — a whole email, reply quotes, the notes
+// block, etc. Finds the header line so the manager can just Select-All + paste (no line-picking).
+function extractCountCsv(input) {
+  let raw = String(input == null ? '' : input);
+  const ni = raw.indexOf('NOTES FROM COUNTER');            // cut the appended notes block
+  if (ni >= 0) { const ls = raw.lastIndexOf('\n', ni); raw = ls >= 0 ? raw.slice(0, ls) : raw.slice(0, ni); }
+  const lines = raw.split(/\r?\n/);
+  let hi = -1;                                             // find the CSV header line
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].toLowerCase();
+    if (l.indexOf('item number') >= 0 && l.indexOf('count qty') >= 0) { hi = i; break; }
+  }
+  if (hi < 0) return raw.trim();                           // no header found — let the caller error gracefully
+  const out = [lines[hi]];                                 // keep from the header down
+  for (let i = hi + 1; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t) continue;
+    if (/^(on |from:|sent:|to:|subject:|cc:|>)/i.test(t) && t.indexOf(',') < 0) continue; // drop email reply lines
+    out.push(lines[i]);
+  }
+  return out.join('\n').trim();
+}
 function varianceCsvHtml(rawInput) {
-  let raw = (rawInput || '').trim();
+  const raw = extractCountCsv(rawInput);
   if (!raw) { showToast('Copy or paste a count first', 'err'); return null; }
-  // Drop the appended "NOTES FROM COUNTER" block (if present) so it isn't parsed as CSV rows.
-  const ni = raw.indexOf('NOTES FROM COUNTER');
-  if (ni >= 0) { const ls = raw.lastIndexOf('\n', ni); raw = (ls >= 0 ? raw.slice(0, ls) : raw.slice(0, ni)).trim(); }
   let rows;
   try { rows = parseCsv(raw); } catch(e) { showToast('Could not read that CSV', 'err'); return null; }
   if (rows.length < 2) { showToast('CSV looks empty', 'err'); return null; }
